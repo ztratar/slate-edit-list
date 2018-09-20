@@ -532,9 +532,11 @@ function splitListItem(opts, change) {
         return change;
     }
 
-    var splitOffset = value.startOffset;
+    var start = value.selection.start;
 
-    return change.splitDescendantsByKey(currentItem.key, value.startKey, splitOffset);
+    var splitOffset = start.offset;
+
+    return change.splitDescendantsByKey(currentItem.key, start.key, splitOffset);
 }
 
 exports.default = splitListItem;
@@ -647,8 +649,8 @@ function getHighestSelectedBlocks(value) {
     var document = value.document;
 
 
-    var startBlock = document.getClosestBlock(range.startKey);
-    var endBlock = document.getClosestBlock(range.endKey);
+    var startBlock = document.getClosestBlock(range.start.key);
+    var endBlock = document.getClosestBlock(range.end.key);
 
     if (startBlock === endBlock) {
         return (0, _immutable.List)([startBlock]);
@@ -699,7 +701,7 @@ function core() {
 
     return {
         schema: (0, _validation.schema)(opts),
-        validateNode: (0, _validation.validateNode)(opts),
+        normalizeNode: (0, _validation.normalizeNode)(opts),
 
         utils: {
             getCurrentItem: _utils.getCurrentItem.bind(null, opts),
@@ -788,18 +790,20 @@ var _utils = require('../utils');
  */
 function onBackspace(event, change, editor, opts) {
     var value = change.value;
-    var startOffset = value.startOffset,
-        selection = value.selection;
+    var selection = value.selection;
+    var start = selection.start,
+        isCollapsed = selection.isCollapsed,
+        isExpanded = selection.isExpanded;
 
     // Only unwrap...
     // ... with a collapsed selection
 
-    if (selection.isExpanded) {
+    if (isExpanded) {
         return undefined;
     }
 
     // ... when at the beginning of nodes
-    if (startOffset > 0) {
+    if (start.offset > 0) {
         return undefined;
     }
     // ... in a list
@@ -808,7 +812,7 @@ function onBackspace(event, change, editor, opts) {
         return undefined;
     }
     // ... more precisely at the beginning of the current item
-    if (!selection.isAtStartOf(currentItem)) {
+    if (!isCollapsed || !start.isAtStartOfNode(currentItem)) {
         return undefined;
     }
 
@@ -856,11 +860,11 @@ function onEnter(event, change, editor, opts) {
     event.preventDefault();
 
     // If expanded, delete first.
-    if (value.isExpanded) {
+    if (value.selection.isExpanded) {
         change.delete();
     }
 
-    if (currentItem.isEmpty) {
+    if (!value.schema.isVoid(currentItem) && currentItem.text === '') {
         // Block is empty, we exit the list
         if ((0, _utils.getItemDepth)(opts, value) > 1) {
             return (0, _changes.decreaseItemDepth)(opts, change);
@@ -893,23 +897,21 @@ var _utils = require('../utils');
  */
 function onTab(event, change, editor, opts) {
     var value = change.value;
-    var isCollapsed = value.isCollapsed;
+    var isCollapsed = value.selection.isCollapsed;
 
 
     if (!isCollapsed || !(0, _utils.getCurrentItem)(opts, value)) {
         return undefined;
     }
 
+    event.preventDefault();
+
     // Shift+tab reduce depth
     if (event.shiftKey) {
-        event.preventDefault();
-
         return (0, _changes.decreaseItemDepth)(opts, change);
     }
 
     // Tab increases depth
-    event.preventDefault();
-
     return (0, _changes.increaseItemDepth)(opts, change);
 }
 exports.default = onTab;
@@ -1030,7 +1032,7 @@ function getCurrentItem(opts, value, block) {
 
 
     if (!block) {
-        if (!value.selection.startKey) return null;
+        if (!value.selection.start.key) return null;
         block = value.startBlock;
     }
 
@@ -1138,15 +1140,15 @@ function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { de
 function getItemsAtRange(opts, value, range) {
     range = range || value.selection;
 
-    if (!range.startKey) {
+    if (!range.start.key) {
         return (0, _immutable.List)();
     }
 
     var document = value.document;
 
 
-    var startBlock = document.getClosestBlock(range.startKey);
-    var endBlock = document.getClosestBlock(range.endKey);
+    var startBlock = document.getClosestBlock(range.start.key);
+    var endBlock = document.getClosestBlock(range.end.key);
 
     if (startBlock === endBlock) {
         var item = (0, _getCurrentItem2.default)(opts, value, startBlock);
@@ -1336,107 +1338,22 @@ exports.default = isSelectionInList;
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.validateNode = exports.schema = undefined;
+exports.normalizeNode = exports.schema = undefined;
 
 var _schema = require('./schema');
 
 var _schema2 = _interopRequireDefault(_schema);
 
-var _validateNode = require('./validateNode');
+var _normalizeNode = require('./normalizeNode');
 
-var _validateNode2 = _interopRequireDefault(_validateNode);
+var _normalizeNode2 = _interopRequireDefault(_normalizeNode);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 exports.schema = _schema2.default;
-exports.validateNode = _validateNode2.default;
+exports.normalizeNode = _normalizeNode2.default;
 
-},{"./schema":26,"./validateNode":27}],26:[function(require,module,exports){
-'use strict';
-
-Object.defineProperty(exports, "__esModule", {
-    value: true
-});
-
-require('slate');
-
-function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
-
-/**
- * Create a schema definition with rules to normalize lists
- */
-function schema(opts) {
-    var constructedSchema = {
-        blocks: _defineProperty({}, opts.typeItem, {
-            parent: { types: opts.types },
-            nodes: [{ objects: ['block'] }],
-
-            normalize: normalize({
-                parent_type_invalid: function parent_type_invalid(change, context) {
-                    return change.unwrapBlockByKey(context.node.key, {
-                        normalize: false
-                    });
-                },
-                child_object_invalid: function child_object_invalid(change, context) {
-                    return wrapChildrenInDefaultBlock(opts, change, context.node);
-                }
-            })
-        })
-    };
-
-    // validate all list types, ensure they only have list item children
-    opts.types.forEach(function (type) {
-        constructedSchema.blocks[type] = {
-            nodes: [{ types: [opts.typeItem] }],
-            normalize: normalize({
-                child_type_invalid: function child_type_invalid(change, context) {
-                    return change.wrapBlockByKey(context.child.key, opts.typeItem, {
-                        normalize: false
-                    });
-                }
-            })
-        };
-    });
-
-    return constructedSchema;
-}
-
-/*
- * Allows to define a normalize function through a keyed collection of functions
- */
-function normalize(reasons) {
-    return function (change, reason, context) {
-        var reasonFn = reasons[reason];
-        if (reasonFn) {
-            reasonFn(change, context);
-        }
-    };
-}
-
-/**
- * Wraps all child of a node in the default block type.
- * Returns a change, for chaining purposes
- */
-function wrapChildrenInDefaultBlock(opts, change, node) {
-    change.wrapBlockByKey(node.nodes.first().key, opts.typeDefault, {
-        normalize: false
-    });
-
-    var wrapper = change.value.document.getDescendant(node.key).nodes.first();
-
-    // Add in the remaining items
-    node.nodes.rest().forEach(function (child, index) {
-        return change.moveNodeByKey(child.key, wrapper.key, index + 1, {
-            normalize: false
-        });
-    });
-
-    return change;
-}
-
-exports.default = schema;
-
-},{"slate":238}],27:[function(require,module,exports){
+},{"./normalizeNode":26,"./schema":27}],26:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -1452,7 +1369,7 @@ var _utils = require('../utils');
 /**
  * Create a schema definition with rules to normalize lists
  */
-function validateNode(opts) {
+function normalizeNode(opts) {
     return function (node) {
         return joinAdjacentLists(opts, node);
     };
@@ -1500,9 +1417,96 @@ function joinAdjacentLists(opts, node) {
     };
 }
 
-exports.default = validateNode;
+exports.default = normalizeNode;
 
-},{"../utils":22,"slate":238}],28:[function(require,module,exports){
+},{"../utils":22,"slate":238}],27:[function(require,module,exports){
+'use strict';
+
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+
+require('slate');
+
+function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
+
+/**
+ * Create a schema definition with rules to normalize lists
+ */
+function schema(opts) {
+    var constructedSchema = {
+        blocks: _defineProperty({}, opts.typeItem, {
+            parent: opts.types.map(function (t) {
+                return { type: t };
+            }),
+            nodes: [{ match: { object: 'block' } }],
+
+            normalize: normalize({
+                parent_type_invalid: function parent_type_invalid(change, context) {
+                    return change.unwrapBlockByKey(context.node.key, {
+                        normalize: false
+                    });
+                },
+                child_object_invalid: function child_object_invalid(change, context) {
+                    return wrapChildrenInDefaultBlock(opts, change, context.node);
+                }
+            })
+        })
+    };
+
+    // validate all list types, ensure they only have list item children
+    opts.types.forEach(function (type) {
+        constructedSchema.blocks[type] = {
+            nodes: [{ match: { type: opts.typeItem } }],
+            normalize: normalize({
+                child_type_invalid: function child_type_invalid(change, context) {
+                    return change.wrapBlockByKey(context.child.key, opts.typeItem, {
+                        normalize: false
+                    });
+                }
+            })
+        };
+    });
+
+    return constructedSchema;
+}
+
+/*
+ * Allows to define a normalize function through a keyed collection of functions
+ */
+function normalize(reasons) {
+    return function (change, error) {
+        var reasonFn = reasons[error.code];
+        if (reasonFn) {
+            reasonFn(change, error);
+        }
+    };
+}
+
+/**
+ * Wraps all child of a node in the default block type.
+ * Returns a change, for chaining purposes
+ */
+function wrapChildrenInDefaultBlock(opts, change, node) {
+    change.wrapBlockByKey(node.nodes.first().key, opts.typeDefault, {
+        normalize: false
+    });
+
+    var wrapper = change.value.document.getDescendant(node.key).nodes.first();
+
+    // Add in the remaining items
+    node.nodes.rest().forEach(function (child, index) {
+        return change.moveNodeByKey(child.key, wrapper.key, index + 1, {
+            normalize: false
+        });
+    });
+
+    return change;
+}
+
+exports.default = schema;
+
+},{"slate":238}],28:[function(require,module,exports){
 'use strict';
 
 var GROUP_LEFT_TO_RIGHT,
