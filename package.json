@@ -1,18 +1,15 @@
 {
-  "name": "slate-edit-list",
+  "name": "@productboard/slate-edit-list",
   "description": "A Slate plugin to handle keyboard events in lists.",
-  "version": "0.12.1",
+  "version": "0.13.1",
   "license": "Apache-2.0",
-  "repository": "git://github.com/GitbookIO/slate-edit-list.git",
+  "repository": "git://github.com/productboard/slate-edit-list.git",
   "main": "./dist/index.js",
   "peerDependencies": {
     "immutable": "^3.8.2",
-    "slate": "^0.32.0"
+    "slate": "^0.40.0"
   },
-  "files": [
-    "dist",
-    "*.md"
-  ],
+  "files": ["dist", "*.md"],
   "devDependencies": {
     "babel-cli": "^6.26.0",
     "babel-core": "^6.26.0",
@@ -55,13 +52,12 @@
     "prepublish": "npm run build:dist && npm run build:flow",
     "postpublish": "npm run deploy-example",
     "lint": "eslint ./",
-    "build-example": "browserify ./example/main.js -o ./example/bundle.js -t [ babelify --presets [ env react stage-0 ] ] -t [ stringify --extensions [.yaml] ]",
+    "build-example":
+      "browserify ./example/main.js -o ./example/bundle.js -t [ babelify --presets [ env react stage-0 ] ] -t [ stringify --extensions [.yaml] ]",
     "serve-example": "http-server ./example/ -p 8081",
     "start": "npm run build-example && npm run serve-example",
     "deploy-example": "npm run build-example && gh-pages -d ./example",
     "test": "./node_modules/.bin/mocha ./tests/all.js --compilers js:babel-register --reporter=list"
   },
-  "keywords": [
-    "slate"
-  ]
+  "keywords": ["slate"]
 }
