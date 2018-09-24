@@ -15,40 +15,57 @@ const h = createHyperscript({
 export default (
     <value>
         <document>
-            <heading>Slate + List Edition</heading>
-            <paragraph>
-                This page is a basic example of Slate + slate-edit-list plugin.
-                Press Enter in a list to create a new list item. Press Enter
-                again to exit and Shift+Enter to create a paragraph in a list.
-                The items at range are detected and highlighted, for
-                demonstration purpose.
-            </paragraph>
-            <ul_list style={{ listStyleType: 'disc' }}>
+            <ul_list>
                 <list_item>
-                    <paragraph>First item in the list</paragraph>
+                    <paragraph>Lorem ipsum dolor sit amet, consectetur adipiscing elit.</paragraph>
                 </list_item>
                 <list_item>
-                    <paragraph>List item can contain blocks</paragraph>
-                    <heading>Here is a heading</heading>
-                    <paragraph>And another paragraph</paragraph>
-                </list_item>
-                <list_item>
-                    <paragraph>
-                        Third item in the list, with a nested list
-                    </paragraph>
-                    <ol_list style={{ listStyleType: 'decimal' }}>
+                    <paragraph>Nulla a risus mauris.</paragraph>
+                    <ul_list>
                         <list_item>
-                            <paragraph>First item in the nested list</paragraph>
+                            <paragraph>Lorem ipsum dolor sit amet, consectetur adipiscing elit.</paragraph>
+                        </list_item>
+                        <list_item>
+                            <paragraph>Nulla a risus mauris.</paragraph>
+                            <ul_list>
+                                <list_item>
+                                    <paragraph>Lorem ipsum dolor sit amet, consectetur adipiscing elit.</paragraph>
+                                </list_item>
+                                <list_item>
+                                    <paragraph>Nulla a risus mauris.</paragraph>
+                                </list_item>
+                                <list_item>
+                                    <paragraph>Vestibulum ut felis ut augue maximus varius a sit amet ex.</paragraph>
+                                </list_item>
+                            </ul_list>
+                        </list_item>
+                        <list_item>
+                            <paragraph>Vestibulum ut felis ut augue maximus varius a sit amet ex.</paragraph>
+                        </list_item>
+                    </ul_list>
+                </list_item>
+                <list_item>
+                    <paragraph>Vestibulum ut felis ut augue maximus varius a sit amet ex.</paragraph>
+                </list_item>
+                <list_item>
+                    <paragraph>Vestibulum elementum augue et ipsum aliquam, ut dignissim erat lacinia.Maecenas tempor blandit elit, vel mattis nulla.</paragraph>
+                    <ol_list>
+                        <list_item>
+                            <paragraph>Phasellus lectus mauris, lacinia at eros quis, viverra vestibulum augue.</paragraph>
                         </list_item>
                         <list_item>
                             <paragraph>
-                                Second item in the nested list
+                                Donec nec justo eu risus aliquet ullamcorper sit amet sodales tellus.
                             </paragraph>
                         </list_item>
                     </ol_list>
                 </list_item>
+                <list_item>
+                    <paragraph>
+                        Donec nec justo eu risus aliquet ullamcorper sit amet sodales tellus.
+                    </paragraph>
+                </list_item>
             </ul_list>
-            <paragraph>End paragraph</paragraph>
         </document>
     </value>
 );
