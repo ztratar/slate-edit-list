@@ -641,18 +641,12 @@ var _options2 = _interopRequireDefault(_options);
 
 var _ = require('.');
 
-var _isList = require('../utils/isList');
-
-var _isList2 = _interopRequireDefault(_isList);
-
-var _isItem = require('../utils/isItem');
-
-var _isItem2 = _interopRequireDefault(_isItem);
+var _utils = require('../utils');
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 function filterListDescendants(options, node) {
-    return (0, _isList2.default)(options, node) || (0, _isItem2.default)(options, node);
+    return (0, _utils.isList)(options, node) || (0, _utils.isItem)(options, node);
 }
 
 function mapListDescendants(document) {
@@ -686,10 +680,38 @@ function unwrapMappedNodes(change, mappedNode) {
     });
 }
 
+function findAncestorList(options, document, startBlock, endBlock) {
+    var list = document.getCommonAncestor(startBlock.key, endBlock.key);
+
+    if ((0, _utils.isList)(options, list)) {
+        return list;
+    }
+
+    return document.getClosest(list.key, function (node) {
+        return (0, _utils.isList)(options, node);
+    });
+}
+
+function isSameLevel(sortedMappedNodes) {
+    if (!sortedMappedNodes.size) {
+        return true;
+    }
+
+    var max = sortedMappedNodes.first().depth;
+    var min = sortedMappedNodes.last().depth;
+
+    return max === min;
+}
+
 /**
  * Toggle list on the selected range.
  */
 function toggleList(options, change) {
+    // Selection is not a list — we want to create one.
+    if (!(0, _utils.isSelectionInList)(options, change.value)) {
+        return (0, _.wrapInList)(options, change);
+    }
+
     var _change$value = change.value,
         document = _change$value.document,
         selection = _change$value.selection;
@@ -697,23 +719,33 @@ function toggleList(options, change) {
 
     var startBlock = document.getClosestBlock(selection.start.key);
     var endBlock = document.getClosestBlock(selection.end.key);
-    var commonAncestor = document.getCommonAncestor(startBlock.key, endBlock.key);
 
-    if (!(0, _isList2.default)(options, commonAncestor)) {
-        return (0, _.wrapInList)(options, change);
+    // The selection is in a single block.
+    // Let's unwrap just the block, not the whole list.
+    if (startBlock === endBlock) {
+        return (0, _.unwrapList)(options, change);
     }
 
-    var listsAndItems = commonAncestor.filterDescendants(function (node) {
+    // We need to find the closest list for the selection in its ancestors.
+    var list = findAncestorList(options, document, startBlock, endBlock);
+
+    // Filter all `ul`, `ol` and `li` blocks and sort them by their depth in hierarchy.
+    var listsAndItems = list.filterDescendants(function (node) {
         return filterListDescendants(options, node);
     }).map(mapListDescendants(document)).sort(sortListDescendants);
 
+    // We don't want to destroy the whole list case the selection is not nested.
+    if (isSameLevel(listsAndItems)) {
+        return (0, _.unwrapList)(options, change);
+    }
+
     var newChange = listsAndItems.reduce(unwrapMappedNodes, change);
-    return newChange.unwrapBlockByKey(commonAncestor.key);
+    return newChange.unwrapBlockByKey(list.key);
 }
 
 exports.default = toggleList;
 
-},{".":5,"../options":16,"../utils/isItem":25,"../utils/isList":26,"slate":241}],8:[function(require,module,exports){
+},{".":5,"../options":16,"../utils":24,"slate":241}],8:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -1356,7 +1388,7 @@ function getItemsAtRange(opts, value, range) {
         var startPath = ancestor.getPath(startBlock.key);
         var endPath = ancestor.getPath(endBlock.key);
 
-        return ancestor.nodes.slice(startPath[0], endPath[0] + 1);
+        return ancestor.nodes.slice(startPath.get(0), endPath.get(0) + 1);
     } else if (ancestor.type === opts.typeItem) {
         // The ancestor is the highest list item that covers the range
         return (0, _immutable.List)([ancestor]);
@@ -1441,7 +1473,7 @@ exports.default = getPreviousItem;
 Object.defineProperty(exports, "__esModule", {
     value: true
 });
-exports.isSelectionInList = exports.isList = exports.getPreviousItem = exports.getListForItem = exports.getItemsAtRange = exports.getItemDepth = exports.getDeepestItemDepth = exports.getCurrentList = exports.getCurrentItem = undefined;
+exports.isSelectionInList = exports.isItem = exports.isList = exports.getPreviousItem = exports.getListForItem = exports.getItemsAtRange = exports.getItemDepth = exports.getDeepestItemDepth = exports.getCurrentList = exports.getCurrentItem = undefined;
 
 var _getCurrentItem = require('./getCurrentItem');
 
@@ -1475,6 +1507,10 @@ var _isList = require('./isList');
 
 var _isList2 = _interopRequireDefault(_isList);
 
+var _isItem = require('./isItem');
+
+var _isItem2 = _interopRequireDefault(_isItem);
+
 var _isSelectionInList = require('./isSelectionInList');
 
 var _isSelectionInList2 = _interopRequireDefault(_isSelectionInList);
@@ -1489,9 +1525,10 @@ exports.getItemsAtRange = _getItemsAtRange2.default;
 exports.getListForItem = _getListForItem2.default;
 exports.getPreviousItem = _getPreviousItem2.default;
 exports.isList = _isList2.default;
+exports.isItem = _isItem2.default;
 exports.isSelectionInList = _isSelectionInList2.default;
 
-},{"./getCurrentItem":17,"./getCurrentList":18,"./getDeepestItemDepth":19,"./getItemDepth":20,"./getItemsAtRange":21,"./getListForItem":22,"./getPreviousItem":23,"./isList":26,"./isSelectionInList":27}],25:[function(require,module,exports){
+},{"./getCurrentItem":17,"./getCurrentList":18,"./getDeepestItemDepth":19,"./getItemDepth":20,"./getItemsAtRange":21,"./getListForItem":22,"./getPreviousItem":23,"./isItem":25,"./isList":26,"./isSelectionInList":27}],25:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
