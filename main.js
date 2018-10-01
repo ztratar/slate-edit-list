@@ -51,6 +51,7 @@ class Example extends React.Component<*, *> {
 
     renderToolbar() {
         const {
+            toggleList,
             wrapInList,
             unwrapList,
             increaseItemDepth,
@@ -88,6 +89,10 @@ class Example extends React.Component<*, *> {
                 </button>
                 <button onClick={() => this.call(unwrapList)}>
                     Unwrap from list
+                </button>
+
+                <button onClick={() => this.call(toggleList)}>
+                    Toggle list
                 </button>
             </div>
         );
