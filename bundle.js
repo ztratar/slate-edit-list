@@ -436,20 +436,22 @@ function decreaseItemDepth(opts, change) {
     var willEmptyCurrentList = currentList.nodes.size === followingItems.size + 1;
 
     if (!followingItems.isEmpty()) {
-        // Add them as sublist of currentItem
-        var sublist = _slate.Block.create({
-            object: 'block',
-            type: currentList.type,
-            data: currentList.data
-        });
-        // Add the sublist
-        change.insertNodeByKey(currentItem.key, currentItem.nodes.size, sublist, { normalize: false });
+        change.withoutNormalizing(function () {
+            // Add them as sublist of currentItem
+            var sublist = _slate.Block.create({
+                object: 'block',
+                type: currentList.type,
+                data: currentList.data
+            });
+            // Add the sublist
+            change.insertNodeByKey(currentItem.key, currentItem.nodes.size, sublist);
 
-        change.moveNodeByKey(currentItem.key, parentList.key, parentList.nodes.indexOf(parentItem) + 1, { normalize: false });
+            change.moveNodeByKey(currentItem.key, parentList.key, parentList.nodes.indexOf(parentItem) + 1);
 
-        // Move the followingItems to the sublist
-        followingItems.forEach(function (item, index) {
-            return change.moveNodeByKey(item.key, sublist.key, sublist.nodes.size + index, { normalize: false });
+            // Move the followingItems to the sublist
+            followingItems.forEach(function (item, index) {
+                return change.moveNodeByKey(item.key, sublist.key, sublist.nodes.size + index);
+            });
         });
     } else {
         change.moveNodeByKey(currentItem.key, parentList.key, parentList.nodes.indexOf(parentItem) + 1);
@@ -545,8 +547,8 @@ destKey) {
         data: currentList.data
     });
 
-    change.insertNodeByKey(destKey, lastIndex, newSublist, {
-        normalize: false
+    change.withoutNormalizing(function () {
+        change.insertNodeByKey(destKey, lastIndex, newSublist);
     });
 
     return change.moveNodeByKey(item.key, newSublist.key, 0);
@@ -675,8 +677,8 @@ function sortListDescendants(a, b) {
 }
 
 function unwrapMappedNodes(change, mappedNode) {
-    return change.unwrapBlockByKey(mappedNode.node.key, undefined, {
-        normalize: false
+    return change.withoutNormalizing(function () {
+        change.unwrapBlockByKey(mappedNode.node.key);
     });
 }
 
@@ -767,31 +769,31 @@ function unwrapList(opts, change) {
     }
 
     // Unwrap the items from their list
-    items.forEach(function (item) {
-        return change.unwrapNodeByKey(item.key, { normalize: false });
-    });
-
-    // Parent of the list of the items
-    var firstItem = items.first();
-    var parent = change.value.document.getParent(firstItem.key);
-
-    var index = parent.nodes.findIndex(function (node) {
-        return node.key === firstItem.key;
-    });
-
-    // Unwrap the items' children
-    items.forEach(function (item) {
-        item.nodes.forEach(function (node) {
-            change.moveNodeByKey(node.key, parent.key, index, {
-                normalize: false
-            });
-            index += 1;
+    change.withoutNormalizing(function () {
+        items.forEach(function (item) {
+            return change.unwrapNodeByKey(item.key);
         });
-    });
 
-    // Finally, remove the now empty items
-    items.forEach(function (item) {
-        return change.removeNodeByKey(item.key, { normalize: false });
+        // Parent of the list of the items
+        var firstItem = items.first();
+        var parent = change.value.document.getParent(firstItem.key);
+
+        var index = parent.nodes.findIndex(function (node) {
+            return node.key === firstItem.key;
+        });
+
+        // Unwrap the items' children
+        items.forEach(function (item) {
+            item.nodes.forEach(function (node) {
+                change.moveNodeByKey(node.key, parent.key, index);
+                index += 1;
+            });
+        });
+
+        // Finally, remove the now empty items
+        items.forEach(function (item) {
+            return change.removeNodeByKey(item.key);
+        });
     });
 
     return change;
@@ -820,25 +822,25 @@ function wrapInList(opts, change, type, data) {
     var selectedBlocks = getHighestSelectedBlocks(change.value);
     type = type || opts.types[0];
 
-    // Wrap in container
-    change.wrapBlock({
-        type: type,
-        data: _slate.Data.create(data)
-    }, { normalize: false });
+    change.withoutNormalizing(function () {
+        // Wrap in container
+        change.wrapBlock({
+            type: type,
+            data: _slate.Data.create(data)
+        });
 
-    // Wrap in list items
-    selectedBlocks.forEach(function (node) {
-        if ((0, _utils.isList)(opts, node)) {
-            // Merge its items with the created list
-            node.nodes.forEach(function (_ref) {
-                var key = _ref.key;
-                return change.unwrapNodeByKey(key, { normalize: false });
-            });
-        } else {
-            change.wrapBlockByKey(node.key, opts.typeItem, {
-                normalize: false
-            });
-        }
+        // Wrap in list items
+        selectedBlocks.forEach(function (node) {
+            if ((0, _utils.isList)(opts, node)) {
+                // Merge its items with the created list
+                node.nodes.forEach(function (_ref) {
+                    var key = _ref.key;
+                    return change.unwrapNodeByKey(key);
+                });
+            } else {
+                change.wrapBlockByKey(node.key, opts.typeItem);
+            }
+        });
     });
 
     return change.normalize();
@@ -993,7 +995,7 @@ var _utils = require('../utils');
 /**
  * User pressed Delete in an editor
  */
-function onBackspace(event, change, editor, opts) {
+function onBackspace(event, change, next, opts) {
     var value = change.value;
     var selection = value.selection;
     var start = selection.start,
@@ -1004,21 +1006,21 @@ function onBackspace(event, change, editor, opts) {
     // ... with a collapsed selection
 
     if (isExpanded) {
-        return undefined;
+        return next();
     }
 
     // ... when at the beginning of nodes
     if (start.offset > 0) {
-        return undefined;
+        return next();
     }
     // ... in a list
     var currentItem = (0, _utils.getCurrentItem)(opts, value);
     if (!currentItem) {
-        return undefined;
+        return next();
     }
     // ... more precisely at the beginning of the current item
     if (!isCollapsed || !start.isAtStartOfNode(currentItem)) {
-        return undefined;
+        return next();
     }
 
     event.preventDefault();
@@ -1046,11 +1048,11 @@ var _utils = require('../utils');
  * Enter in an empty list item should remove it
  * Shift+Enter in a list item should make a new line
  */
-function onEnter(event, change, editor, opts) {
+function onEnter(event, change, next, opts) {
     // Pressing Shift+Enter
     // should split block normally
     if (event.shiftKey) {
-        return undefined;
+        return next();
     }
 
     var value = change.value;
@@ -1059,7 +1061,7 @@ function onEnter(event, change, editor, opts) {
 
     // Not in a list
     if (!currentItem) {
-        return undefined;
+        return next();
     }
 
     event.preventDefault();
@@ -1069,7 +1071,7 @@ function onEnter(event, change, editor, opts) {
         change.delete();
     }
 
-    if (!value.schema.isVoid(currentItem) && currentItem.text === '') {
+    if (!change.isVoid(currentItem) && currentItem.text === '') {
         // Block is empty, we exit the list
         if ((0, _utils.getItemDepth)(opts, value) > 1) {
             return (0, _changes.decreaseItemDepth)(opts, change);
@@ -1100,13 +1102,13 @@ var _utils = require('../utils');
  * Tab       -> Increase item depth if inside a list item
  * Shift+Tab -> Decrease item depth if inside a list item
  */
-function onTab(event, change, editor, opts) {
+function onTab(event, change, next, opts) {
     var value = change.value;
     var isCollapsed = value.selection.isCollapsed;
 
 
     if (!isCollapsed || !(0, _utils.getCurrentItem)(opts, value)) {
-        return undefined;
+        return next();
     }
 
     event.preventDefault();
@@ -1164,8 +1166,8 @@ function EditList() {
 /**
  * User is pressing a key in the editor
  */
-function onKeyDown(opts, event, change, editor) {
-    var args = [event, change, editor, opts];
+function onKeyDown(opts, event, change, next) {
+    var args = [event, change, next, opts];
 
     switch (event.key) {
         case KEY_ENTER:
@@ -1175,7 +1177,7 @@ function onKeyDown(opts, event, change, editor) {
         case KEY_BACKSPACE:
             return _handlers.onBackspace.apply(undefined, args);
         default:
-            return undefined;
+            return next();
     }
 }
 
@@ -1656,17 +1658,19 @@ function joinAdjacentLists(opts, node) {
      */
     // We join in reverse order, so that multiple lists folds onto the first one
     return function (change) {
-        invalids.reverse().forEach(function (pair) {
-            var _pair = _slicedToArray(pair, 2),
-                first = _pair[0],
-                second = _pair[1];
+        change.withoutNormalizing(function () {
+            invalids.reverse().forEach(function (pair) {
+                var _pair = _slicedToArray(pair, 2),
+                    first = _pair[0],
+                    second = _pair[1];
 
-            var updatedSecond = change.value.document.getDescendant(second.key);
-            updatedSecond.nodes.forEach(function (secondNode, index) {
-                change.moveNodeByKey(secondNode.key, first.key, first.nodes.size + index, { normalize: false });
+                var updatedSecond = change.value.document.getDescendant(second.key);
+                updatedSecond.nodes.forEach(function (secondNode, index) {
+                    change.moveNodeByKey(secondNode.key, first.key, first.nodes.size + index);
+                });
+
+                change.removeNodeByKey(second.key);
             });
-
-            change.removeNodeByKey(second.key, { normalize: false });
         });
     };
 }
