@@ -49,6 +49,8 @@ class Example extends React.Component<*, *> {
         value: INITIAL_VALUE
     };
 
+    editor = React.createRef();
+
     renderToolbar() {
         const {
             toggleList,
@@ -98,9 +100,9 @@ class Example extends React.Component<*, *> {
         );
     }
 
-    call(change) {
-        this.setState({
-            value: this.state.value.change().call(change).value
+    call(changeCall) {
+        this.editor.current.change(change => {
+            this.setState({ value: change.call(changeCall).value });
         });
     }
 
@@ -115,6 +117,7 @@ class Example extends React.Component<*, *> {
             <div>
                 {this.renderToolbar()}
                 <Editor
+                    ref={this.editor}
                     placeholder={'Enter some text...'}
                     plugins={plugins}
                     value={this.state.value}
