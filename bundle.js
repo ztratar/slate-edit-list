@@ -106,7 +106,7 @@ var Example = function (_React$Component) {
 
         return _ret = (_temp = (_this = _possibleConstructorReturn(this, (_ref = Example.__proto__ || Object.getPrototypeOf(Example)).call.apply(_ref, [this].concat(args))), _this), _this.state = {
             value: _value2.default
-        }, _this.onChange = function (_ref2) {
+        }, _this.editor = _react2.default.createRef(), _this.onChange = function (_ref2) {
             var value = _ref2.value;
 
             _this.setState({
@@ -192,9 +192,11 @@ var Example = function (_React$Component) {
         }
     }, {
         key: 'call',
-        value: function call(change) {
-            this.setState({
-                value: this.state.value.change().call(change).value
+        value: function call(changeCall) {
+            var _this3 = this;
+
+            this.editor.current.change(function (change) {
+                _this3.setState({ value: change.call(changeCall).value });
             });
         }
     }, {
@@ -205,6 +207,7 @@ var Example = function (_React$Component) {
                 null,
                 this.renderToolbar(),
                 _react2.default.createElement(_slateReact.Editor, {
+                    ref: this.editor,
                     placeholder: 'Enter some text...',
                     plugins: plugins,
                     value: this.state.value,
@@ -541,17 +544,28 @@ destKey) {
         throw new Error('Destination is not in a list');
     }
 
+    // Creating empty list creates also empty list item - placeholder item is meant to be easily deleted in the end
+    var tmpBlock = _slate.Block.create({
+        object: 'block',
+        type: opts.typeItem
+    });
+
+    // @TODO Why does empty list contain empty item?
     var newSublist = _slate.Block.create({
         object: 'block',
         type: currentList.type,
-        data: currentList.data
+        data: currentList.data,
+        nodes: [tmpBlock]
     });
 
     change.withoutNormalizing(function () {
         change.insertNodeByKey(destKey, lastIndex, newSublist);
     });
 
-    return change.moveNodeByKey(item.key, newSublist.key, 0);
+    change.moveNodeByKey(item.key, newSublist.key, 0);
+    change.removeNodeByKey(tmpBlock.key);
+
+    return change;
 }
 
 exports.default = increaseItemDepth;
@@ -647,7 +661,7 @@ var _utils = require('../utils');
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-function filterListDescendants(options, node) {
+function isListOrItem(options, node) {
     return (0, _utils.isList)(options, node) || (0, _utils.isItem)(options, node);
 }
 
@@ -660,7 +674,7 @@ function mapListDescendants(document) {
     };
 }
 
-function sortListDescendants(a, b) {
+function sortListDescendants(options, a, b) {
     if (a.depth !== b.depth) {
         return b.depth - a.depth;
     }
@@ -669,7 +683,7 @@ function sortListDescendants(a, b) {
         return 0;
     }
 
-    if (a.node.type === 'list_item') {
+    if (a.node.type === options.typeItem) {
         return -1;
     }
 
@@ -678,19 +692,35 @@ function sortListDescendants(a, b) {
 
 function unwrapMappedNodes(change, mappedNode) {
     return change.withoutNormalizing(function () {
-        change.unwrapBlockByKey(mappedNode.node.key);
+        change.unwrapBlockByKey(mappedNode.node.key, mappedNode.node.type);
     });
 }
 
-function findAncestorList(options, document, startBlock, endBlock) {
-    var list = document.getCommonAncestor(startBlock.key, endBlock.key);
+function findAncestorList(change, options, commonAncestor) {
+    var _change$value = change.value,
+        document = _change$value.document,
+        selection = _change$value.selection;
+    // This flag should be true, when elements are in selection
 
-    if ((0, _utils.isList)(options, list)) {
-        return list;
-    }
+    var isInSelectionFlag = false;
 
-    return document.getClosest(list.key, function (node) {
-        return (0, _utils.isList)(options, node);
+    return commonAncestor.filterDescendants(function (node) {
+        return isListOrItem(options, node);
+    }).filter(function (node) {
+        var hasStart = node.hasNode(selection.start.key);
+        var hasEnd = node.hasNode(selection.end.key);
+        var isListItem = (0, _utils.isItem)(options, node);
+
+        if (hasStart && isListItem) isInSelectionFlag = true;
+        if (hasEnd && isListItem) isInSelectionFlag = false;
+
+        return isInSelectionFlag || hasStart || hasEnd;
+    }).map(mapListDescendants(document)).sort(function () {
+        for (var _len = arguments.length, params = Array(_len), _key = 0; _key < _len; _key++) {
+            params[_key] = arguments[_key];
+        }
+
+        return sortListDescendants.apply(undefined, [options].concat(params));
     });
 }
 
@@ -709,40 +739,50 @@ function isSameLevel(sortedMappedNodes) {
  * Toggle list on the selected range.
  */
 function toggleList(options, change) {
-    // Selection is not a list — we want to create one.
-    if (!(0, _utils.isSelectionInList)(options, change.value)) {
-        return (0, _.wrapInList)(options, change);
-    }
-
-    var _change$value = change.value,
-        document = _change$value.document,
-        selection = _change$value.selection;
-
+    var _change$value2 = change.value,
+        document = _change$value2.document,
+        selection = _change$value2.selection;
 
     var startBlock = document.getClosestBlock(selection.start.key);
     var endBlock = document.getClosestBlock(selection.end.key);
 
+    // -------- SINGLE BLOCK ---------------------------------------------------
     // The selection is in a single block.
     // Let's unwrap just the block, not the whole list.
     if (startBlock === endBlock) {
+        return (0, _utils.isSelectionInList)(options, change.value) ? (0, _.unwrapList)(options, change) : (0, _.wrapInList)(options, change);
+    }
+
+    // -------- NOT A SINGLE BLOCK -------------------------------------------
+    var commonAncestor = document.getCommonAncestor(startBlock.key, endBlock.key);
+
+    var sortedMappedNodes = findAncestorList(change, options, commonAncestor);
+
+    // There are no lists or items in selection => wrap them
+    if (!sortedMappedNodes.size) {
+        return (0, _.wrapInList)(options, change);
+    }
+
+    // All items are the same level => unwrap them
+    if (isSameLevel(sortedMappedNodes)) {
         return (0, _.unwrapList)(options, change);
     }
 
-    // We need to find the closest list for the selection in its ancestors.
-    var list = findAncestorList(options, document, startBlock, endBlock);
-
-    // Filter all `ul`, `ol` and `li` blocks and sort them by their depth in hierarchy.
-    var listsAndItems = list.filterDescendants(function (node) {
-        return filterListDescendants(options, node);
-    }).map(mapListDescendants(document)).sort(sortListDescendants);
-
-    // We don't want to destroy the whole list case the selection is not nested.
-    if (isSameLevel(listsAndItems)) {
-        return (0, _.unwrapList)(options, change);
+    // Common Ancestor is not a list or item
+    if (!isListOrItem(options, commonAncestor)) {
+        var _newChange = sortedMappedNodes
+        // @TODO last item is filtered, so it wouldn't break down flat whole list -> unwrapNodeByKey should be solution (problem with key)
+        .filter(function (item) {
+            return sortedMappedNodes.last().depth !== item.depth;
+        }).reduce(unwrapMappedNodes, change);
+        return _newChange;
     }
 
-    var newChange = listsAndItems.reduce(unwrapMappedNodes, change);
-    return newChange.unwrapBlockByKey(list.key);
+    // Unwrap all nested nodes
+    var newChange = sortedMappedNodes.reduce(unwrapMappedNodes, change);
+
+    // Unwrap common ancestor
+    return (0, _.unwrapList)(options, newChange);
 }
 
 exports.default = toggleList;
@@ -1626,8 +1666,8 @@ var _utils = require('../utils');
  * Create a schema definition with rules to normalize lists
  */
 function normalizeNode(opts) {
-    return function (node) {
-        return joinAdjacentLists(opts, node);
+    return function (node, next) {
+        return joinAdjacentLists(opts, node) || next();
     };
 }
 
@@ -1636,21 +1676,21 @@ function normalizeNode(opts) {
  */
 function joinAdjacentLists(opts, node) {
     if (node.object !== 'document' && node.object !== 'block') {
-        return undefined;
+        return;
     }
 
     var invalids = node.nodes.map(function (child, i) {
         if (!(0, _utils.isList)(opts, child)) return null;
-        var next = node.nodes.get(i + 1);
-        if (!next || !(0, _utils.isList)(opts, next) || !opts.canMerge(child, next)) {
+        var nextNode = node.nodes.get(i + 1);
+        if (!nextNode || !(0, _utils.isList)(opts, nextNode) || !opts.canMerge(child, nextNode)) {
             return null;
         }
 
-        return [child, next];
+        return [child, nextNode];
     }).filter(Boolean);
 
     if (invalids.isEmpty()) {
-        return undefined;
+        return;
     }
 
     /**
