@@ -1666,7 +1666,7 @@ var _utils = require('../utils');
  * Create a schema definition with rules to normalize lists
  */
 function normalizeNode(opts) {
-    return function (node, next) {
+    return function (node, editor, next) {
         return joinAdjacentLists(opts, node) || next();
     };
 }
