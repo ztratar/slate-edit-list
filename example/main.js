@@ -51,6 +51,13 @@ class Example extends React.Component<*, *> {
 
     editor = React.createRef();
 
+    componentDidCatch(e, info) {
+      // Get us more info about any thrown render() errors
+      // See https://github.com/facebook/react/pull/5602
+      console.log('error:', e);
+      console.log('info :', info);
+    }
+
     renderToolbar() {
         const {
             toggleList,
