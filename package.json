@@ -61,7 +61,7 @@
     "start": "npm run build-example && npm run serve-example",
     "deploy-example": "npm run build-example && gh-pages -d ./example",
     "dev": "concurrently \"npm run serve-example\" \"nodemon\"",
-    "test": "./node_modules/.bin/mocha ./tests/* --compilers js:babel-register --reporter=list",
+    "test": "mocha \"./lib/**/*.test.js\" --compilers js:babel-register",
     "test:watch": "yarn test --watch"
   },
   "keywords": [
