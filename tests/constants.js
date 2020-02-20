@@ -61,6 +61,50 @@ export const NESTED_LIST = [
     },
 ];
 
+export const NESTED_LIST_MULTIPLE_NODES = [
+    {
+        type: 'ul_list',
+        children: [
+            {
+                type: 'list_item',
+                children: [
+                    {
+                        type: 'ul_list',
+                        children: [
+                            {
+                                type: 'list_item',
+                                children: [
+                                    {
+                                        type: 'paragraph',
+                                        children: [
+                                            {
+                                                text: 'Nested list item',
+                                            },
+                                        ],
+                                    },
+                                ],
+                            },
+                        ],
+                    },
+                ],
+            },
+            {
+                type: 'list_item',
+                children: [
+                    {
+                        type: 'paragraph',
+                        children: [
+                            {
+                                text: 'Nested list item',
+                            },
+                        ],
+                    },
+                ],
+            },
+        ],
+    },
+];
+
 export const COMPLICATED_LIST = [
     {
         type: 'ul_list',
