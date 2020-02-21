@@ -95,7 +95,90 @@ export const NESTED_LIST_MULTIPLE_NODES = [
                         type: 'paragraph',
                         children: [
                             {
-                                text: 'Nested list item',
+                                text: 'List item',
+                            },
+                        ],
+                    },
+                ],
+            },
+        ],
+    },
+];
+
+export const COMPLEX_LIST = [
+    {
+        type: 'ul_list',
+        children: [
+            {
+                type: 'list_item',
+                children: [
+                    {
+                        type: 'ul_list',
+                        children: [
+                            {
+                                type: 'list_item',
+                                children: [
+                                    {
+                                        type: 'paragraph',
+                                        children: [
+                                            {
+                                                text: 'Nested list item no. 1',
+                                            },
+                                        ],
+                                    },
+                                ],
+                            },
+                            {
+                                type: 'list_item',
+                                children: [
+                                    {
+                                        type: 'paragraph',
+                                        children: [
+                                            {
+                                                text: 'Nested list item no. 2',
+                                            },
+                                        ],
+                                    },
+                                ],
+                            },
+                            {
+                                type: 'list_item',
+                                children: [
+                                    {
+                                        type: 'paragraph',
+                                        children: [
+                                            {
+                                                text: 'Nested list item no. 3',
+                                            },
+                                        ],
+                                    },
+                                ],
+                            },
+                        ],
+                    },
+                ],
+            },
+            {
+                type: 'list_item',
+                children: [
+                    {
+                        type: 'paragraph',
+                        children: [
+                            {
+                                text: 'List item no. 2',
+                            },
+                        ],
+                    },
+                ],
+            },
+            {
+                type: 'list_item',
+                children: [
+                    {
+                        type: 'paragraph',
+                        children: [
+                            {
+                                text: 'List item no. 3',
                             },
                         ],
                     },
