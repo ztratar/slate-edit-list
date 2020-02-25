@@ -59,29 +59,25 @@ const Example = () => {
     const [withEditList, onKeyDown] = EditListPlugin();
 
     const editor = useMemo(() => withEditList(withReact(createEditor())), []);
-    const renderElement = useCallback((props: *) => {
-        switch (props.element.type) {
-            case 'ul_list':
-                return <ul {...props} />;
-            case 'ol_list':
-                return <ol {...props} />;
+    const renderElement = useCallback(
+        ({ attributes, children, element }: *) => {
+            switch (element.type) {
+                case 'ul_list':
+                    return <ul {...attributes}>{children}</ul>;
+                case 'ol_list':
+                    return <ol {...attributes}>{children}</ol>;
 
-            case 'list_item':
-                return (
-                    <li
-                        // className={isCurrentItem ? 'current-item' : ''}
-                        // title={isCurrentItem ? 'Current Item' : ''}
-                        {...props}
-                    />
-                );
+                case 'list_item':
+                    return <li {...attributes}>{children}</li>;
 
-            case 'heading':
-                return <h1 {...props} />;
-            case 'paragraph':
-            default:
-                return <p {...props} />;
+                case 'heading':
+                    return <h1 {...attributes}>{children}</h1>;
+                case 'paragraph':
+                default:
+                    return <p {...attributes}>{children}</p>;
+            }
         }
-    });
+    );
 
     const [value, setValue] = useState(INITIAL_VALUE);
 
@@ -100,5 +96,4 @@ const Example = () => {
     );
 };
 
-// $FlowFixMe
 ReactDOM.render(<Example />, document.getElementById('example'));
