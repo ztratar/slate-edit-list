@@ -1,46 +1,14 @@
 // @flow
 /* global document */
 /* eslint-disable import/no-extraneous-dependencies */
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import ReactDOM from 'react-dom';
 import { createEditor } from 'slate';
 import { Slate, Editable, withReact } from 'slate-react';
 
-import withEditList from '../lib';
+import { EditListPlugin } from '../lib';
 
 import INITIAL_VALUE from './value';
-
-function renderNode(props: *) {
-    const { node, attributes, children, editor } = props;
-    const isCurrentItem = plugin.utils
-        .getItemsAtRange(editor.value)
-        .contains(node);
-
-    switch (node.type) {
-        case 'ul_list':
-            return <ul {...attributes}>{children}</ul>;
-        case 'ol_list':
-            return <ol {...attributes}>{children}</ol>;
-
-        case 'list_item':
-            return (
-                <li
-                    className={isCurrentItem ? 'current-item' : ''}
-                    title={isCurrentItem ? 'Current Item' : ''}
-                    {...props.attributes}
-                >
-                    {props.children}
-                </li>
-            );
-
-        case 'paragraph':
-            return <p {...attributes}>{children}</p>;
-        case 'heading':
-            return <h1 {...attributes}>{children}</h1>;
-        default:
-            return <p {...attributes}>{children}</p>;
-    }
-}
 
 function renderToolbar() {
     const {
@@ -48,7 +16,7 @@ function renderToolbar() {
         wrapInList,
         unwrapList,
         increaseItemDepth,
-        decreaseItemDepth
+        decreaseItemDepth,
     } = plugin.changes;
     const inList = plugin.utils.isSelectionInList(this.state.value);
 
@@ -77,22 +45,43 @@ function renderToolbar() {
 
             <span className="sep">·</span>
 
-            <button onClick={() => this.call(wrapInList)}>
-                Wrap in list
-            </button>
+            <button onClick={() => this.call(wrapInList)}>Wrap in list</button>
             <button onClick={() => this.call(unwrapList)}>
                 Unwrap from list
             </button>
 
-            <button onClick={() => this.call(toggleList)}>
-                Toggle list
-            </button>
+            <button onClick={() => this.call(toggleList)}>Toggle list</button>
         </div>
     );
 }
 
 const Example = () => {
-    const editor = useMemo(() => withEditList()(withReact(createEditor())), []);
+    const [withEditList, onKeyDown] = EditListPlugin();
+
+    const editor = useMemo(() => withEditList(withReact(createEditor())), []);
+    const renderElement = useCallback((props: *) => {
+        switch (props.element.type) {
+            case 'ul_list':
+                return <ul {...props} />;
+            case 'ol_list':
+                return <ol {...props} />;
+
+            case 'list_item':
+                return (
+                    <li
+                        // className={isCurrentItem ? 'current-item' : ''}
+                        // title={isCurrentItem ? 'Current Item' : ''}
+                        {...props}
+                    />
+                );
+
+            case 'heading':
+                return <h1 {...props} />;
+            case 'paragraph':
+            default:
+                return <p {...props} />;
+        }
+    });
 
     const [value, setValue] = useState(INITIAL_VALUE);
 
@@ -102,7 +91,11 @@ const Example = () => {
             value={value}
             onChange={newValue => setValue(newValue)}
         >
-            <Editable placeholder="Enter some text...." />
+            <Editable
+                placeholder="Enter some text...."
+                onKeyDown={onKeyDown(editor)}
+                renderElement={renderElement}
+            />
         </Slate>
     );
 };
