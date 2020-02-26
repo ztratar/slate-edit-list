@@ -39,7 +39,7 @@ const Example = () => {
     );
     // TODO: it needs to rerender when selection changes
     const renderToolbar = useCallback(() => {
-        const inList = Editor.getItemsAtRange(editor).length !== 0;
+        const inList = Editor.isSelectionInList(editor)
 
         return (
             <div>
