@@ -61,6 +61,71 @@ export const NESTED_LIST = [
     },
 ];
 
+export const SIMPLE_NESTED_LIST = [
+    {
+        type: 'ul_list',
+        children: [
+            {
+                type: 'list_item',
+                children: [
+                    {
+                        type: 'paragraph',
+                        children: [
+                            {
+                                text: 'Item 1',
+                            },
+                        ],
+                    },
+                ],
+            },
+            {
+                type: 'list_item',
+                children: [
+                    {
+                        type: 'paragraph',
+                        children: [
+                            {
+                                text: 'Item 2',
+                            },
+                        ],
+                    },
+                    {
+                        type: 'ul_list',
+                        children: [
+                            {
+                                type: 'list_item',
+                                children: [
+                                    {
+                                        type: 'paragraph',
+                                        children: [
+                                            {
+                                                text: 'Item 21',
+                                            },
+                                        ],
+                                    },
+                                ],
+                            },
+                            {
+                                type: 'list_item',
+                                children: [
+                                    {
+                                        type: 'paragraph',
+                                        children: [
+                                            {
+                                                text: 'Item 22',
+                                            },
+                                        ],
+                                    },
+                                ],
+                            },
+                        ],
+                    },
+                ],
+            },
+        ],
+    },
+];
+
 export const NESTED_LIST_MULTIPLE_NODES = [
     {
         type: 'ul_list',
