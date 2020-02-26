@@ -6,7 +6,8 @@
   "repository": "git://github.com/productboard/slate-edit-list.git",
   "main": "./dist/index.js",
   "peerDependencies": {
-    "slate": "^0.40.0"
+    "slate": "^0.40.0",
+    "slate-react": "^0.57.1"
   },
   "files": [
     "dist",
@@ -47,6 +48,7 @@
     "slate-hyperscript": "^0.57.1",
     "slate-plain-serializer": "^0.7.11",
     "slate-react": "^0.57.1",
+    "slate-history": "^0.57.1",
     "stringify": "^5.1.0"
   },
   "scripts": {
@@ -60,7 +62,8 @@
     "start": "npm run build-example && npm run serve-example",
     "deploy-example": "npm run build-example && gh-pages -d ./example",
     "dev": "concurrently \"npm run serve-example\" \"nodemon\"",
-    "test": "./node_modules/.bin/mocha ./tests/all.js --compilers js:babel-register --reporter=list"
+    "test": "mocha \"./lib/**/*.test.js\" --compilers js:babel-register",
+    "test:watch": "yarn test --watch"
   },
   "keywords": [
     "slate"
