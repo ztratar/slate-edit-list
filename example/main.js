@@ -4,16 +4,20 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import ReactDOM from 'react-dom';
 import { createEditor } from 'slate';
+import { withHistory } from 'slate-history';
+
 import { Slate, Editable, withReact } from 'slate-react';
 
 import { EditListPlugin } from '../lib';
-
 import INITIAL_VALUE from './value';
 
 const Example = () => {
     const [withEditList, onKeyDown, { Editor, Transforms }] = EditListPlugin();
 
-    const editor = useMemo(() => withEditList(withReact(createEditor())), []);
+    const editor = useMemo(
+        () => withEditList(withHistory(withReact(createEditor()))),
+        []
+    );
     const renderElement = useCallback(
         ({ attributes, children, element }: *) => {
             switch (element.type) {
@@ -52,7 +56,7 @@ const Example = () => {
 
                 <button
                     className={inList ? '' : 'disabled'}
-                    onClick={() => EdTransformsitor.decreaseItemDepth(editor)}
+                    onClick={() => Transforms.decreaseItemDepth(editor)}
                 >
                     <i className="fa fa-outdent fa-lg" />
                 </button>
