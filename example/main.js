@@ -10,53 +10,8 @@ import { EditListPlugin } from '../lib';
 
 import INITIAL_VALUE from './value';
 
-function renderToolbar() {
-    const {
-        toggleList,
-        wrapInList,
-        unwrapList,
-        increaseItemDepth,
-        decreaseItemDepth,
-    } = plugin.changes;
-    const inList = plugin.utils.isSelectionInList(this.state.value);
-
-    return (
-        <div>
-            <button
-                className={inList ? 'active' : ''}
-                onClick={() => this.call(inList ? unwrapList : wrapInList)}
-            >
-                <i className="fa fa-list-ul fa-lg" />
-            </button>
-
-            <button
-                className={inList ? '' : 'disabled'}
-                onClick={() => this.call(decreaseItemDepth)}
-            >
-                <i className="fa fa-outdent fa-lg" />
-            </button>
-
-            <button
-                className={inList ? '' : 'disabled'}
-                onClick={() => this.call(increaseItemDepth)}
-            >
-                <i className="fa fa-indent fa-lg" />
-            </button>
-
-            <span className="sep">·</span>
-
-            <button onClick={() => this.call(wrapInList)}>Wrap in list</button>
-            <button onClick={() => this.call(unwrapList)}>
-                Unwrap from list
-            </button>
-
-            <button onClick={() => this.call(toggleList)}>Toggle list</button>
-        </div>
-    );
-}
-
 const Example = () => {
-    const [withEditList, onKeyDown] = EditListPlugin();
+    const [withEditList, onKeyDown, { Editor, Transforms }] = EditListPlugin();
 
     const editor = useMemo(() => withEditList(withReact(createEditor())), []);
     const renderElement = useCallback(
@@ -78,6 +33,52 @@ const Example = () => {
             }
         }
     );
+    // TODO: it needs to rerender when selection changes
+    const renderToolbar = useCallback(() => {
+        const inList = Editor.getItemsAtRange(editor).length !== 0;
+
+        return (
+            <div>
+                <button
+                    className={inList ? 'active' : ''}
+                    onClick={() =>
+                        inList
+                            ? Transforms.unwrapList(editor)
+                            : Transforms.wrapInList(editor)
+                    }
+                >
+                    <i className="fa fa-list-ul fa-lg" />
+                </button>
+
+                <button
+                    className={inList ? '' : 'disabled'}
+                    onClick={() => EdTransformsitor.decreaseItemDepth(editor)}
+                >
+                    <i className="fa fa-outdent fa-lg" />
+                </button>
+
+                <button
+                    className={inList ? '' : 'disabled'}
+                    onClick={() => Transforms.increaseItemDepth(editor)}
+                >
+                    <i className="fa fa-indent fa-lg" />
+                </button>
+
+                <span className="sep">·</span>
+
+                <button onClick={() => Transforms.wrapInList(editor)}>
+                    Wrap in list
+                </button>
+                <button onClick={() => Transforms.unwrapList(editor)}>
+                    Unwrap from list
+                </button>
+
+                <button onClick={() => Transforms.toggleList(editor)}>
+                    Toggle list
+                </button>
+            </div>
+        );
+    });
 
     const [value, setValue] = useState(INITIAL_VALUE);
 
@@ -87,6 +88,7 @@ const Example = () => {
             value={value}
             onChange={newValue => setValue(newValue)}
         >
+            {renderToolbar()}
             <Editable
                 placeholder="Enter some text...."
                 onKeyDown={onKeyDown(editor)}
