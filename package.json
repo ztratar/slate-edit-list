@@ -6,7 +6,7 @@
   "repository": "git://github.com/productboard/slate-edit-list.git",
   "main": "./dist/index.js",
   "peerDependencies": {
-    "slate": "^0.40.0",
+    "slate": "^0.57.1",
     "slate-react": "^0.57.1"
   },
   "files": [
