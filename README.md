@@ -1,7 +1,6 @@
 # slate-edit-list
 
-[![NPM version](https://badge.fury.io/js/slate-edit-list.svg)](http://badge.fury.io/js/slate-edit-list)
-[![Linux Build Status](https://travis-ci.org/GitbookIO/slate-edit-list.png?branch=master)](https://travis-ci.org/GitbookIO/slate-edit-list)
+[![npm version](https://badge.fury.io/js/%40productboard%2Fslate-edit-list.svg)](https://badge.fury.io/js/%40productboard%2Fslate-edit-list)
 
 A Slate plugin to handle keyboard events in lists. List items can contain blocks.
 
@@ -10,7 +9,7 @@ Demo: [gitbookio.github.io/slate-edit-list/](https://gitbookio.github.io/slate-e
 ### Install
 
 ```
-npm install slate-edit-list
+npm install @productboard/slate-edit-list
 ```
 
 ### Features
@@ -29,23 +28,23 @@ Simple validation/normalization (see [assumptions about the schema](#assumption-
 - List items can only be the direct children of a list.
 - List items must always contain blocks.
 
-Useful transforms: see [Utilities and Transform](#utilities-and-transform).
+Useful transforms: see [Utilities and Transforms](#utilities-and-transforms).
 
 ### Simple Usage
 
 ```js
-import EditList from 'slate-edit-list'
+import { EditListPlugin } from '@productboard/slate-edit-list'
 
-const plugins = [
-  EditList()
-]
+const options = {} // Optional options
+
+const [ withEditList, onKeyDown, { Editor, Element, Transforms }] = EditListPlugin(options)
 ```
 
 #### Arguments
 
 This plugin accepts options to redefine the following block types:
 
-- `types: string = ["ol_list", "ul_list"]` — the array of possible types for list containers. First value will be used as default.
+- `types: string = ["ul_list", "ol_list"]` — the array of possible types for list containers. First value will be used as default.
 - `typeItem: string = "list_item"` — type for list items.
 - `typeDefault: string = "paragraph"` — type for default block in list items.
 - `canMerge: (Node, Node) => boolean` — controls which list can be merged automatically (for example when they are adjacent). Defaults to merging list with identical types
@@ -53,7 +52,7 @@ This plugin accepts options to redefine the following block types:
 
 #### Assumption about the schema
 
-You can use this plugins with custom list block types (using plugin [arguments](#arguments)). But your lists structure should still conform to a few rules. These rules are implemented as schema.
+You can use this plugin with custom list block types (using plugin [arguments](#arguments)). But your list structure should still conform to a few rules. These rules are implemented as normalizations.
 
 Here is what a minimal list would look like:
 
@@ -110,52 +109,78 @@ nodes:
                         text: Item 1.2
 ```
 
-### Utilities and Transform
+### Utilities and Transforms
 
 `slate-edit-list` exports utilities and transforms:
 
-#### `plugin.utils.isSelectionInList(value: Value) => Boolean`
+#### Element
 
-Return true if selection is inside a list (and it can be unwrap).
+##### `Element.isList(node: Node) => boolean`
 
-#### `plugin.utils.isList(node: Node) => Boolean`
+Return true if the type of the node is one of the list types from options.
 
-Return true if the node is one of the list type.
+##### `Element.isItem(node: Node) => boolean`
 
-#### `plugin.utils.getItemDepth(value: Value, block: Block?) => Number`
+Return true if the type of the node is the list item type from options.
 
-Returns the depth of the current item (or the depth of the given block) in a list. 0 means not in a list.
+#### Editor
 
-#### `plugin.utils.getCurrentItem(value: Value, block: Block?) => Block || Void`
+##### `Editor.isSelectionInList(editor: Editor) => boolean`
 
-Returns the current item at selection (or at the given block).
+Return true if selection is inside a list (and it can be unwrapped).
 
-#### `plugin.utils.getCurrentList(value: Value, block: Block?) => Block || Void`
+##### `Editor.getItemDepth(editor: Editor, path?: Path) => number`
 
-Returns the current list at selection (or at the given block).
+Returns the depth of the current item (or the depth of the given path) in a list. 0 means not in a list.
 
-#### `plugin.utils.getItemsAtRange(value: Value, range: Selection?) => List<Node>`
+##### `Editor.getDeepestItemDepth(editor: Editor, path: Path) => number`
 
-Return the list of items at the given range. The returned items are the highest list of of successive items that cover the given range.
+Returns the depth of the deepest list item in a path.
 
-The returned list is empty if no such list can be found.
+##### `Editor.getCurrentItem(editor: Editor, path?: Path) => NodeEntry<Element> || null`
 
-#### `plugin.changes.increaseItemDepth(change: Change) => Transform`
+Returns the current item at selection (or at the given path).
+
+##### `Editor.getCurrentList(editor: Editor, path?: Path) => NodeEntry<Element> || null`
+
+Returns the current list at selection (or at the given path).
+
+##### `Editor.getPreviousItem(editor: Editor, path?: Path) => NodeEntry<Element> || null`
+
+Returns the list item preceding the item at selection (or at the given path).  
+
+##### `Editor.getListForItem(editor: Editor, path: Path) => NodeEntry<Element> || null`
+
+Returns the list element the item at the specified path belongs to. 
+
+##### `Editor.getItemsAtRange(editor: Editor, range?: Range) => Array<NodeEntry<Element>>`
+
+Return an array of items at the given range. The returned items are the highest list of successive items that cover the given range.
+
+The returned array is empty if no such list can be found.
+
+#### Transforms
+
+##### `Transforms.increaseItemDepth(editor: Editor) => void`
 
 Increase the depth of the current item.
 
-#### `plugin.changes.decreaseItemDepth(change: Change) => Transform`
+##### `Transforms.decreaseItemDepth(editor: Editor) => void`
 
 Decrease the depth of the current item.
 
-#### `plugin.changes.wrapInList(change: Change, type: String?, data: Object|Data?) => Transform`
+##### `Transforms.wrapInList(editor: Editor, type?: string, data?: {}) => void`
 
 Wrap the current blocks in list items of a list container of the given type. You can pass optional data for the created list container.
 
-#### `plugin.changes.unwrapList(change: Change) => Transform`
+##### `Transforms.unwrapList(editor: Editor) => void`
 
 Unwrap all items at range from their list.
 
-#### `plugin.changes.splitListItem(change: Change) => Transform`
+##### `Transforms.splitListItem(editor: Editor) => void`
 
 Split current block into a new list item.
+
+##### `Transforms.toggleList(editor: Editor) => void`
+
+Toggle (wrap/unwrap) list at selection.
