@@ -37,9 +37,23 @@ Useful transforms: see [Utilities and Transforms](#utilities-and-transforms).
 ```js
 import { EditListPlugin } from '@productboard/slate-edit-list'
 
-const options = {} // Optional options
+const options = {} // additional options
 
-const [ withEditList, onKeyDown, { Editor, Element, Transforms }] = EditListPlugin(options)
+const [ 
+    withEditList, // applies normalization to editor 
+    onKeyDown, // keyDown handler for keyboard shortcuts
+    { Editor, Element, Transforms } // Slate classes with added utility functions and transforms this package provides
+] = EditListPlugin(options);
+
+const editor = useMemo(() => withEditList(withReact(createEditor())), []);
+
+const [value, setValue] = useState([]);
+
+return (
+    <Slate editor={editor} value={value} onChange={newValue => setValue(newValue)}>
+        <Editable onKeyDown={onKeyDown(editor)} />
+    </Slate>
+);
 ```
 
 #### Arguments
