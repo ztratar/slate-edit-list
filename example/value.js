@@ -5,21 +5,21 @@ import { createHyperscript } from 'slate-hyperscript';
 const h = createHyperscript({
     elements: {
         heading: {
-            type: 'heading'
+            type: 'heading',
         },
         paragraph: {
-            type: 'paragraph'
+            type: 'paragraph',
         },
         ul_list: {
-            type: 'ul_list'
+            type: 'ul_list',
         },
         ol_list: {
-            type: 'ol_list'
+            type: 'ol_list',
         },
         list_item: {
-            type: 'list_item'
-        }
-    }
+            type: 'list_item',
+        },
+    },
 });
 
 export default (
