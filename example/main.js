@@ -77,8 +77,13 @@ const Example = () => {
                     Unwrap from list
                 </button>
 
+                <button
+                    onClick={() => Transforms.toggleList(editor, 'ol_list')}
+                >
+                    Toggle ordered list
+                </button>
                 <button onClick={() => Transforms.toggleList(editor)}>
-                    Toggle list
+                    Toggle unordered list
                 </button>
             </div>
         );
