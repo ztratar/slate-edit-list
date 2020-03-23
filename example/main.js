@@ -85,6 +85,21 @@ const Example = () => {
                 <button onClick={() => Transforms.toggleList(editor)}>
                     Toggle unordered list
                 </button>
+
+                <button
+                    onClick={() => {
+                        console.log(JSON.stringify(editor.selection, null, 2));
+                        console.log(
+                            JSON.stringify(
+                                Editor.getItemsAtRange(editor),
+                                null,
+                                2
+                            )
+                        );
+                    }}
+                >
+                    Dump selection
+                </button>
             </div>
         );
     });
