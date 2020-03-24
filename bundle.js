@@ -152,6 +152,16 @@ var Example = function Example() {
                         return Transforms.toggleList(editor);
                     } },
                 'Toggle unordered list'
+            ),
+            _react2.default.createElement(
+                'button',
+                {
+                    onClick: function onClick() {
+                        console.log(JSON.stringify(editor.selection, null, 2));
+                        console.log(JSON.stringify(Editor.getItemsAtRange(editor), null, 2));
+                    }
+                },
+                'Dump selection'
             )
         );
     });
@@ -181,7 +191,7 @@ var Example = function Example() {
 
 _reactDom2.default.render(_react2.default.createElement(Example, null), document.getElementById('example'));
 
-},{"../lib":14,"./value":2,"react":47,"react-dom":44,"slate":58,"slate-history":55,"slate-react":57}],2:[function(require,module,exports){
+},{"../lib":14,"./value":2,"react":50,"react-dom":47,"slate":61,"slate-history":58,"slate-react":60}],2:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -348,7 +358,7 @@ exports.default = h(
     )
 );
 
-},{"slate-hyperscript":56}],3:[function(require,module,exports){
+},{"slate-hyperscript":59}],3:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -373,12 +383,12 @@ var _utils = require('../utils');
  * No-op for root items.
  */
 var decreaseItemDepth = exports.decreaseItemDepth = function decreaseItemDepth(options) {
-    return function (editor) {
-        if ((0, _utils.getItemDepth)(options)(editor) === 1) {
+    return function (editor, path) {
+        if ((0, _utils.getItemDepth)(options)(editor, path) === 1) {
             return;
         }
 
-        var currentItemTuple = (0, _utils.getCurrentItem)(options)(editor);
+        var currentItemTuple = (0, _utils.getCurrentItem)(options)(editor, path);
 
         if (!currentItemTuple) {
             return;
@@ -452,7 +462,7 @@ var decreaseItemDepth = exports.decreaseItemDepth = function decreaseItemDepth(o
     };
 };
 
-},{"..":14,"../utils":27,"slate":58}],4:[function(require,module,exports){
+},{"..":14,"../utils":29,"slate":61}],4:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -570,7 +580,7 @@ var increaseItemDepth = exports.increaseItemDepth = function increaseItemDepth(o
     };
 };
 
-},{"..":14,"../utils":27,"slate":58}],5:[function(require,module,exports){
+},{"..":14,"../utils":29,"slate":61}],5:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -677,13 +687,13 @@ var splitListItem = exports.splitListItem = function splitListItem(options) {
     };
 };
 
-},{"..":14,"../utils":27,"slate":58}],7:[function(require,module,exports){
+},{"..":14,"../utils":29,"slate":61}],7:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
     value: true
 });
-exports.toggleList = exports.isListOrItem = undefined;
+exports.toggleList = undefined;
 
 var _slicedToArray = function () { function sliceIterator(arr, i) { var _arr = []; var _n = true; var _d = false; var _e = undefined; try { for (var _i = arr[Symbol.iterator](), _s; !(_n = (_s = _i.next()).done); _n = true) { _arr.push(_s.value); if (i && _arr.length === i) break; } } catch (err) { _d = true; _e = err; } finally { try { if (!_n && _i["return"]) _i["return"](); } finally { if (_d) throw _e; } } return _arr; } return function (arr, i) { if (Array.isArray(arr)) { return arr; } else if (Symbol.iterator in Object(arr)) { return sliceIterator(arr, i); } else { throw new TypeError("Invalid attempt to destructure non-iterable instance"); } }; }();
 
@@ -693,15 +703,7 @@ var _ = require('.');
 
 var _utils = require('../utils');
 
-function _toConsumableArray(arr) { if (Array.isArray(arr)) { for (var i = 0, arr2 = Array(arr.length); i < arr.length; i++) { arr2[i] = arr[i]; } return arr2; } else { return Array.from(arr); } }
-
-var isListOrItem = exports.isListOrItem = function isListOrItem(options) {
-    return function (node) {
-        return (0, _utils.isList)(options)(node) || (0, _utils.isItem)(options)(node);
-    };
-};
-
-var isSameLevel = function isSameLevel(nodeEntries) {
+var allItemsOnSameLevel = function allItemsOnSameLevel(nodeEntries) {
     if (nodeEntries.length === 0) {
         return true;
     }
@@ -716,32 +718,40 @@ var isSameLevel = function isSameLevel(nodeEntries) {
     });
 };
 
-var unwrapAllLists = function unwrapAllLists(options) {
-    return function (editor, nodes) {
-        var ancestorDescendantsLists = nodes.filter(function (_ref3) {
-            var _ref4 = _slicedToArray(_ref3, 1),
-                node = _ref4[0];
+var isListItemAfterTheFirstItem = function isListItemAfterTheFirstItem(listItemPath, closestListItem) {
+    if (closestListItem) {
+        return !_slate.Path.isAncestor(listItemPath, closestListItem[1]);
+    }
 
-            return (0, _utils.isList)(options)(node);
-        }).reverse();
+    return true;
+};
 
-        var descendantListsPathRefs = ancestorDescendantsLists.map(function (_ref5) {
-            var _ref6 = _slicedToArray(_ref5, 2),
-                descendantPath = _ref6[1];
+var unwrapAllItemsInSelection = function unwrapAllItemsInSelection(options) {
+    return function (editor, listItemsInSelection) {
+        var listItemPathRefs = listItemsInSelection.map(function (_ref3) {
+            var _ref4 = _slicedToArray(_ref3, 2),
+                listItemPath = _ref4[1];
 
-            return _slate.Editor.pathRef(editor, descendantPath);
+            return _slate.Editor.pathRef(editor, listItemPath);
         });
 
-        // Unwrap all nested lists
+        // move items leftmost, start from the end so only one item is affected
         _slate.Editor.withoutNormalizing(editor, function () {
-            descendantListsPathRefs.forEach(function (descendantListPathRef) {
-                (0, _.unwrapList)(options)(editor, descendantListPathRef.current);
-                descendantListPathRef.unref();
+            listItemPathRefs.reverse().forEach(function (listItemPathRef) {
+                while ((0, _utils.getItemDepth)(options)(editor, listItemPathRef.current) > 1) {
+                    (0, _.decreaseItemDepth)(options)(editor, listItemPathRef.current);
+                }
             });
         });
 
-        // Unwrap common ancestor
+        var listItemsRange = _slate.Editor.range(editor, listItemPathRefs[0].current, listItemPathRefs[listItemPathRefs.length - 1].current);
+
+        _slate.Transforms.select(editor, listItemsRange);
         (0, _.unwrapList)(options)(editor);
+
+        listItemPathRefs.forEach(function (listItemPathRef) {
+            return listItemPathRef.unref();
+        });
     };
 };
 
@@ -766,13 +776,9 @@ var toggleList = exports.toggleList = function toggleList(options) {
             endElement = _Editor$parent4[0],
             endElementPath = _Editor$parent4[1];
 
-        // -------- SINGLE BLOCK ---------------------------------------------------
-        // The selection is in a single block.
-        // Let's unwrap just the block, not the whole list.
-
-
-        if (startElement === endElement) {
-            if ((0, _utils.getItemsAtRange)(options)(editor).length > 0) {
+        var singleElementInSelection = startElement === endElement;
+        if (singleElementInSelection) {
+            if ((0, _utils.getTopmostItemsAtRange)(options)(editor).length > 0) {
                 (0, _.unwrapList)(options)(editor);
             } else {
                 (0, _.wrapInList)(options).apply(undefined, [editor].concat(newListOptions));
@@ -780,50 +786,42 @@ var toggleList = exports.toggleList = function toggleList(options) {
             return;
         }
 
-        // -------- NOT A SINGLE BLOCK -------------------------------------------
-        var ancestorPath = _slate.Path.common(startElementPath, endElementPath);
-        var ancestor = _slate.Node.get(editor, ancestorPath);
-
-        var ancestorDescendants = [].concat(_toConsumableArray(_slate.Editor.nodes(editor, {
-            at: editor.selection,
-            match: isListOrItem(options)
-        }))).filter(function (_ref7) {
-            var _ref8 = _slicedToArray(_ref7, 2),
-                descendantPath = _ref8[1];
-
-            return descendantPath >= ancestorPath;
+        var firstImmediateListItemInSelection = _slate.Editor.above(editor, {
+            at: _slate.Range.start(range),
+            match: (0, _utils.isItem)(options)
         });
-        var ancestorDescendantItems = ancestorDescendants.filter(function (_ref9) {
-            var _ref10 = _slicedToArray(_ref9, 1),
-                itemOrListNode = _ref10[0];
+        // filter is necessary since getting all items at range
+        // includes the leftmost item in deeply nested lists
+        // which doesn't actually feel or seem (UX) like it's part of the selection
+        var listItemsInSelection = (0, _utils.getItemsAtRange)(options)(editor).filter(function (_ref5) {
+            var _ref6 = _slicedToArray(_ref5, 2),
+                listItemPath = _ref6[1];
 
-            return (0, _utils.isItem)(options)(itemOrListNode);
+            return isListItemAfterTheFirstItem(listItemPath, firstImmediateListItemInSelection);
         });
 
-        // There are no items or lists in selection => wrap them
-        if (ancestorDescendantItems.length === 0) {
+        var noItemsInSelection = listItemsInSelection.length === 0;
+        if (noItemsInSelection) {
             (0, _.wrapInList)(options).apply(undefined, [editor].concat(newListOptions));
             return;
         }
 
-        // All items and lists are the same level => unwrap them
-        if (isSameLevel(ancestorDescendantItems)) {
+        if (allItemsOnSameLevel(listItemsInSelection)) {
             (0, _.unwrapList)(options)(editor);
             return;
         }
 
-        // Common Ancestor is not a list or item
-        // TODO: this is not triggered in the main app
-        // So the implementation is skipped
-        if (!isListOrItem(options)(ancestor)) {
-            return;
+        var ancestorPath = _slate.Path.common(startElementPath, endElementPath);
+        var ancestor = _slate.Node.get(editor, ancestorPath);
+        if (!(0, _utils.isListOrItem)(options)(ancestor)) {
+            (0, _.unwrapList)(options)(editor);
         }
 
-        unwrapAllLists(options)(editor, ancestorDescendants);
+        unwrapAllItemsInSelection(options)(editor, listItemsInSelection);
     };
 };
 
-},{".":5,"../utils":27,"slate":58}],8:[function(require,module,exports){
+},{".":5,"../utils":29,"slate":61}],8:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -839,24 +837,12 @@ require('..');
 
 var _utils = require('../utils');
 
-function _toConsumableArray(arr) { if (Array.isArray(arr)) { for (var i = 0, arr2 = Array(arr.length); i < arr.length; i++) { arr2[i] = arr[i]; } return arr2; } else { return Array.from(arr); } }
-
 /**
  * Unwrap items at range from their list.
  */
 var unwrapList = exports.unwrapList = function unwrapList(options) {
-    return function (editor, path) {
-        var items = [];
-
-        if (path) {
-            var currentList = (0, _utils.getCurrentList)(options)(editor, path);
-
-            if (currentList) {
-                items = [].concat(_toConsumableArray(_slate.Node.children(editor, path)));
-            }
-        } else {
-            items = (0, _utils.getItemsAtRange)(options)(editor);
-        }
+    return function (editor) {
+        var items = (0, _utils.getTopmostItemsAtRange)(options)(editor);
 
         if (items.length === 0) {
             return;
@@ -883,7 +869,7 @@ var unwrapList = exports.unwrapList = function unwrapList(options) {
     };
 };
 
-},{"..":14,"../utils":27,"slate":58}],9:[function(require,module,exports){
+},{"..":14,"../utils":29,"slate":61}],9:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -990,7 +976,7 @@ var wrapInList = exports.wrapInList = function wrapInList(options) {
     };
 };
 
-},{"..":14,"../utils":27,"slate":58}],10:[function(require,module,exports){
+},{"..":14,"../utils":29,"slate":61}],10:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -1072,7 +1058,7 @@ var onBackspace = exports.onBackspace = function onBackspace(options, event, edi
     (0, _commands.unwrapList)(options)(editor);
 };
 
-},{"..":14,"../commands":5,"../utils":27,"slate":58}],12:[function(require,module,exports){
+},{"..":14,"../commands":5,"../utils":29,"slate":61}],12:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -1126,7 +1112,7 @@ var onEnter = exports.onEnter = function onEnter(options, event, editor) {
     }
 };
 
-},{"..":14,"../commands":5,"../utils":27,"slate":58}],13:[function(require,module,exports){
+},{"..":14,"../commands":5,"../utils":29,"slate":61}],13:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -1163,7 +1149,7 @@ var onTab = exports.onTab = function onTab(options, event, editor) {
     }
 };
 
-},{"..":14,"../commands":5,"../utils":27,"slate":58}],14:[function(require,module,exports){
+},{"..":14,"../commands":5,"../utils":29,"slate":61}],14:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -1188,15 +1174,11 @@ var KEY_TAB = 'Tab';
 var KEY_BACKSPACE = 'Backspace';
 
 var applyNormalization = function applyNormalization(options, editor) {
-    var defaultNormalization = editor.normalizeNode;
-
-    editor.normalizeNode = function (entry) {
-        (0, _normalizers.childOfListIsAlwaysItem)(options, entry, editor);
-        (0, _normalizers.itemChildrenAreAlwaysElements)(options, entry, editor);
-        (0, _normalizers.itemsWithoutParentListAreUnwrapped)(options, entry, editor);
-        (0, _normalizers.joinAdjacentLists)(options, entry, editor);
-        defaultNormalization(entry);
-    };
+    (0, _normalizers.childOfListIsAlwaysItem)(options, editor);
+    (0, _normalizers.itemChildrenAreAlwaysElements)(options, editor);
+    (0, _normalizers.itemsWithoutParentListAreUnwrapped)(options, editor);
+    (0, _normalizers.joinAdjacentLists)(options, editor);
+    (0, _normalizers.unwrapListsOverDepthLimit)(options, editor);
 };
 
 /**
@@ -1245,6 +1227,7 @@ var getEditorUtils = function getEditorUtils(options) {
         getCurrentList: (0, _utils.getCurrentList)(options),
         getDeepestItemDepth: (0, _utils.getDeepestItemDepth)(options),
         getItemDepth: (0, _utils.getItemDepth)(options),
+        getTopmostItemsAtRange: (0, _utils.getTopmostItemsAtRange)(options),
         getItemsAtRange: (0, _utils.getItemsAtRange)(options),
         getListForItem: (0, _utils.getListForItem)(options),
         getPreviousItem: (0, _utils.getPreviousItem)(options),
@@ -1293,7 +1276,7 @@ var EditListPlugin = exports.EditListPlugin = function EditListPlugin(customOpti
     }];
 };
 
-},{"./commands":5,"./handlers":10,"./normalizers":16,"./utils":27,"slate":58}],15:[function(require,module,exports){
+},{"./commands":5,"./handlers":10,"./normalizers":16,"./utils":29,"slate":61}],15:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -1313,40 +1296,53 @@ require('..');
 /**
  * A rule that wraps children of lists with list item
  */
-function childOfListIsAlwaysItem(options, _ref, editor) {
-    var _ref2 = _slicedToArray(_ref, 2),
-        node = _ref2[0],
-        nodePath = _ref2[1];
+function childOfListIsAlwaysItem(options, editor) {
+    var normalizeNode = editor.normalizeNode;
 
-    var parentNodePath = void 0;
 
-    if ((0, _utils.isItem)(options)(node)) {
-        // we don't care for those that are items already
-        return;
-    }
+    editor.normalizeNode = function (entry) {
+        var _entry = _slicedToArray(entry, 2),
+            node = _entry[0],
+            nodePath = _entry[1];
 
-    try {
-        parentNodePath = _slate.Path.parent(nodePath);
-    } catch (e) {
-        // has no parent (ie. [0] node)
-        return;
-    }
+        var parentNodePath = void 0;
 
-    var parentNode = _slate.Node.get(editor, parentNodePath);
+        if ((0, _utils.isItem)(options)(node)) {
+            // we don't care for those that are items already
+            normalizeNode(entry);
 
-    if ((0, _utils.isList)(options)(parentNode)) {
-        var wrapperItem = {
-            type: options.typeItem,
-            children: []
-        };
+            return;
+        }
 
-        _slate.Transforms.wrapNodes(editor, wrapperItem, {
-            at: nodePath
-        });
-    }
+        try {
+            parentNodePath = _slate.Path.parent(nodePath);
+        } catch (e) {
+            // has no parent (ie. [0] node)
+            normalizeNode(entry);
+
+            return;
+        }
+
+        var parentNode = _slate.Node.get(editor, parentNodePath);
+
+        if ((0, _utils.isList)(options)(parentNode)) {
+            var wrapperItem = {
+                type: options.typeItem,
+                children: []
+            };
+
+            _slate.Transforms.wrapNodes(editor, wrapperItem, {
+                at: nodePath
+            });
+
+            return;
+        }
+
+        normalizeNode(entry);
+    };
 }
 
-},{"..":14,"../utils":27,"slate":58}],16:[function(require,module,exports){
+},{"..":14,"../utils":29,"slate":61}],16:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -1401,7 +1397,19 @@ Object.keys(_joinAdjacentLists).forEach(function (key) {
   });
 });
 
-},{"./childOfListIsAlwaysItem":15,"./itemChildrenAreAlwaysElements":17,"./itemsWithoutParentListAreUnwrapped":18,"./joinAdjacentLists":19}],17:[function(require,module,exports){
+var _unwrapListsOverDepthLimit = require('./unwrapListsOverDepthLimit');
+
+Object.keys(_unwrapListsOverDepthLimit).forEach(function (key) {
+  if (key === "default" || key === "__esModule") return;
+  Object.defineProperty(exports, key, {
+    enumerable: true,
+    get: function get() {
+      return _unwrapListsOverDepthLimit[key];
+    }
+  });
+});
+
+},{"./childOfListIsAlwaysItem":15,"./itemChildrenAreAlwaysElements":17,"./itemsWithoutParentListAreUnwrapped":18,"./joinAdjacentLists":19,"./unwrapListsOverDepthLimit":20}],17:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -1419,35 +1427,46 @@ var _utils = require('../utils');
 /**
  * A rule that wraps children of lists with list item
  */
-function itemChildrenAreAlwaysElements(options, nodeEntry, editor) {
-    var _nodeEntry = _slicedToArray(nodeEntry, 2),
-        node = _nodeEntry[0],
-        nodePath = _nodeEntry[1];
+function itemChildrenAreAlwaysElements(options, editor) {
+    var normalizeNode = editor.normalizeNode;
 
-    var parentNodePath = void 0;
 
-    try {
-        parentNodePath = _slate.Path.parent(nodePath);
-    } catch (e) {
-        // has no parent (ie. editor)
-        return;
-    }
+    editor.normalizeNode = function (entry) {
+        var _entry = _slicedToArray(entry, 2),
+            node = _entry[0],
+            nodePath = _entry[1];
 
-    var parentNode = _slate.Node.get(editor, parentNodePath);
+        var parentNodePath = void 0;
 
-    if (!_slate.Element.isElement(node) && (0, _utils.isItem)(options)(parentNode)) {
-        var wrapperItem = {
-            type: options.typeDefault,
-            children: []
-        };
+        try {
+            parentNodePath = _slate.Path.parent(nodePath);
+        } catch (e) {
+            // has no parent (ie. editor)
+            normalizeNode(entry);
 
-        _slate.Transforms.wrapNodes(editor, wrapperItem, {
-            at: nodePath
-        });
-    }
+            return;
+        }
+
+        var parentNode = _slate.Node.get(editor, parentNodePath);
+
+        if (!_slate.Element.isElement(node) && (0, _utils.isItem)(options)(parentNode)) {
+            var wrapperItem = {
+                type: options.typeDefault,
+                children: []
+            };
+
+            _slate.Transforms.wrapNodes(editor, wrapperItem, {
+                at: nodePath
+            });
+
+            return;
+        }
+
+        normalizeNode(entry);
+    };
 }
 
-},{"../utils":27,"slate":58}],18:[function(require,module,exports){
+},{"../utils":29,"slate":61}],18:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -1465,36 +1484,49 @@ var _utils = require('../utils');
 /**
  * A rule that unwraps list items if they are not in list
  */
-function itemsWithoutParentListAreUnwrapped(options, nodeEntry, editor) {
-    var _nodeEntry = _slicedToArray(nodeEntry, 2),
-        node = _nodeEntry[0],
-        nodePath = _nodeEntry[1];
+function itemsWithoutParentListAreUnwrapped(options, editor) {
+    var normalizeNode = editor.normalizeNode;
 
-    var parentNodePath = void 0;
 
-    if (!(0, _utils.isItem)(options)(node)) {
-        return;
-    }
+    editor.normalizeNode = function (entry) {
+        var _entry = _slicedToArray(entry, 2),
+            node = _entry[0],
+            nodePath = _entry[1];
 
-    try {
-        parentNodePath = _slate.Path.parent(nodePath);
-    } catch (e) {
-        // has no parent (ie. [0] node)
-        return;
-    }
+        var parentNodePath = void 0;
 
-    var parentNode = parentNodePath && _slate.Node.get(editor, parentNodePath);
+        if (!(0, _utils.isItem)(options)(node)) {
+            normalizeNode(entry);
 
-    // either no parent or not a list parent
-    // in both cases, we unwrap list item
-    if (!parentNode || !(0, _utils.isList)(options)(parentNode)) {
-        _slate.Transforms.unwrapNodes(editor, {
-            at: nodePath
-        });
-    }
+            return;
+        }
+
+        try {
+            parentNodePath = _slate.Path.parent(nodePath);
+        } catch (e) {
+            // has no parent (ie. [0] node)
+            normalizeNode(entry);
+
+            return;
+        }
+
+        var parentNode = parentNodePath && _slate.Node.get(editor, parentNodePath);
+
+        // either no parent or not a list parent
+        // in both cases, we unwrap list item
+        if (!parentNode || !(0, _utils.isList)(options)(parentNode)) {
+            _slate.Transforms.unwrapNodes(editor, {
+                at: nodePath
+            });
+
+            return;
+        }
+
+        normalizeNode(entry);
+    };
 }
 
-},{"../utils":27,"slate":58}],19:[function(require,module,exports){
+},{"../utils":29,"slate":61}],19:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -1514,43 +1546,126 @@ function _toConsumableArray(arr) { if (Array.isArray(arr)) { for (var i = 0, arr
 /**
  * A rule that joins adjacent lists of the same type
  */
-function joinAdjacentLists(options, nodeEntry, editor) {
-    var _nodeEntry = _slicedToArray(nodeEntry, 2),
-        node = _nodeEntry[0],
-        nodePath = _nodeEntry[1];
+function joinAdjacentLists(options, editor) {
+    var normalizeNode = editor.normalizeNode;
 
-    if (_slate.Element.isElement(node) && (0, _utils.isList)(options)(node)) {
-        var previousSiblingNodePath = void 0;
-        try {
-            previousSiblingNodePath = _slate.Path.previous(nodePath);
-        } catch (e) {
-            // the node doesn't have a previous sibling (ie. first)
-            return;
+
+    editor.normalizeNode = function (entry) {
+        var _entry = _slicedToArray(entry, 2),
+            node = _entry[0],
+            nodePath = _entry[1];
+
+        if ((0, _utils.isList)(options)(node)) {
+            var previousSiblingNodePath = void 0;
+            try {
+                previousSiblingNodePath = _slate.Path.previous(nodePath);
+            } catch (e) {
+                // the node doesn't have a previous sibling (ie. first)
+                normalizeNode(entry);
+
+                return;
+            }
+
+            var previousSiblingNode = _slate.Node.get(editor, previousSiblingNodePath);
+
+            if ((0, _utils.isList)(options)(previousSiblingNode) && options.canMerge(node, previousSiblingNode)) {
+                var targetNodeLastChildIndex = previousSiblingNode.children.length - 1;
+
+                _slate.Editor.withoutNormalizing(editor, function () {
+                    var targetNodePath = [].concat(_toConsumableArray(previousSiblingNodePath), [
+                    // as the new last child of previous sibling list
+                    targetNodeLastChildIndex + 1]);
+
+                    _slate.Transforms.insertNodes(editor, node.children, {
+                        at: targetNodePath
+                    });
+
+                    _slate.Transforms.removeNodes(editor, {
+                        at: nodePath
+                    });
+                });
+                return;
+            }
         }
 
-        var previousSiblingNode = _slate.Node.get(editor, previousSiblingNodePath);
-
-        if ((0, _utils.isList)(options)(previousSiblingNode) && options.canMerge(node, previousSiblingNode)) {
-            var targetNodeLastChildIndex = previousSiblingNode.children.length - 1;
-
-            _slate.Editor.withoutNormalizing(editor, function () {
-                var targetNodePath = [].concat(_toConsumableArray(previousSiblingNodePath), [
-                // as the new last child of previous sibling list
-                targetNodeLastChildIndex + 1]);
-
-                _slate.Transforms.insertNodes(editor, node.children, {
-                    at: targetNodePath
-                });
-
-                _slate.Transforms.removeNodes(editor, {
-                    at: nodePath
-                });
-            });
-        }
-    }
+        normalizeNode(entry);
+    };
 }
 
-},{"../utils":27,"slate":58}],20:[function(require,module,exports){
+},{"../utils":29,"slate":61}],20:[function(require,module,exports){
+'use strict';
+
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+
+var _slicedToArray = function () { function sliceIterator(arr, i) { var _arr = []; var _n = true; var _d = false; var _e = undefined; try { for (var _i = arr[Symbol.iterator](), _s; !(_n = (_s = _i.next()).done); _n = true) { _arr.push(_s.value); if (i && _arr.length === i) break; } } catch (err) { _d = true; _e = err; } finally { try { if (!_n && _i["return"]) _i["return"](); } finally { if (_d) throw _e; } } return _arr; } return function (arr, i) { if (Array.isArray(arr)) { return arr; } else if (Symbol.iterator in Object(arr)) { return sliceIterator(arr, i); } else { throw new TypeError("Invalid attempt to destructure non-iterable instance"); } }; }();
+
+exports.unwrapListsOverDepthLimit = unwrapListsOverDepthLimit;
+
+var _slate = require('slate');
+
+var _utils = require('../utils');
+
+function _toConsumableArray(arr) { if (Array.isArray(arr)) { for (var i = 0, arr2 = Array(arr.length); i < arr.length; i++) { arr2[i] = arr[i]; } return arr2; } else { return Array.from(arr); } }
+
+/**
+ * A rule that unwraps lists if they are over the depth limit
+ */
+function unwrapListsOverDepthLimit(options, editor) {
+    var normalizeNode = editor.normalizeNode;
+
+
+    editor.normalizeNode = function (nodeEntry) {
+        var _nodeEntry = _slicedToArray(nodeEntry, 2),
+            node = _nodeEntry[0],
+            nodePath = _nodeEntry[1];
+
+        if ((0, _utils.isList)(options)(node) && _slate.Node.has(editor, nodePath)) {
+            var items = [].concat(_toConsumableArray(_slate.Node.children(editor, nodePath)));
+
+            if (items.length === 0) {
+                normalizeNode(nodeEntry);
+
+                return;
+            }
+
+            var allChildrenAreItems = items.every(function (_ref) {
+                var _ref2 = _slicedToArray(_ref, 1),
+                    itemNode = _ref2[0];
+
+                return (0, _utils.isItem)(options)(itemNode);
+            });
+            if (!allChildrenAreItems) {
+                normalizeNode(nodeEntry);
+
+                return;
+            }
+
+            var _items = _slicedToArray(items, 1),
+                _items$ = _slicedToArray(_items[0], 2),
+                firstItemPath = _items$[1];
+
+            var itemDepth = (0, _utils.getItemDepth)(options)(editor, firstItemPath);
+            if (itemDepth > options.maxDepth) {
+                _slate.Transforms.unwrapNodes(editor, {
+                    at: nodePath,
+                    mode: 'lowest',
+                    match: (0, _utils.isListOrItem)(options)
+                });
+                _slate.Transforms.unwrapNodes(editor, {
+                    at: nodePath
+                });
+
+                return;
+            }
+        }
+
+        normalizeNode(nodeEntry);
+    };
+}
+
+},{"../utils":29,"slate":61}],21:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -1581,6 +1696,11 @@ var getCurrentItem = exports.getCurrentItem = function getCurrentItem(options) {
             path = _Editor$first2[1];
         }
 
+        var nodeOnPath = _slate.Node.get(editor, path);
+        if (nodeOnPath && (0, _.isItem)(options)(nodeOnPath)) {
+            return [nodeOnPath, path];
+        }
+
         return _slate.Editor.above(editor, {
             at: path,
             match: function match(node) {
@@ -1591,7 +1711,7 @@ var getCurrentItem = exports.getCurrentItem = function getCurrentItem(options) {
     };
 };
 
-},{".":27,"..":14,"slate":58}],21:[function(require,module,exports){
+},{".":29,"..":14,"slate":61}],22:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -1625,7 +1745,7 @@ var getCurrentList = exports.getCurrentList = function getCurrentList(options) {
     };
 };
 
-},{".":27,"..":14,"slate":58}],22:[function(require,module,exports){
+},{".":29,"..":14,"slate":61}],23:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -1661,7 +1781,7 @@ var getDeepestItemDepth = exports.getDeepestItemDepth = function getDeepestItemD
     };
 };
 
-},{".":27,"..":14,"slate":58}],23:[function(require,module,exports){
+},{".":29,"..":14,"slate":61}],24:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -1698,15 +1818,13 @@ var getItemDepth = exports.getItemDepth = function getItemDepth(options) {
     };
 };
 
-},{".":27,"..":14,"slate":58}],24:[function(require,module,exports){
+},{".":29,"..":14,"slate":61}],25:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
     value: true
 });
 exports.getItemsAtRange = undefined;
-
-var _slicedToArray = function () { function sliceIterator(arr, i) { var _arr = []; var _n = true; var _d = false; var _e = undefined; try { for (var _i = arr[Symbol.iterator](), _s; !(_n = (_s = _i.next()).done); _n = true) { _arr.push(_s.value); if (i && _arr.length === i) break; } } catch (err) { _d = true; _e = err; } finally { try { if (!_n && _i["return"]) _i["return"](); } finally { if (_d) throw _e; } } return _arr; } return function (arr, i) { if (Array.isArray(arr)) { return arr; } else if (Symbol.iterator in Object(arr)) { return sliceIterator(arr, i); } else { throw new TypeError("Invalid attempt to destructure non-iterable instance"); } }; }();
 
 var _slate = require('slate');
 
@@ -1717,8 +1835,7 @@ var _ = require('.');
 function _toConsumableArray(arr) { if (Array.isArray(arr)) { for (var i = 0, arr2 = Array(arr.length); i < arr.length; i++) { arr2[i] = arr[i]; } return arr2; } else { return Array.from(arr); } }
 
 /**
- * Return the array of items at the given range. The returned items are
- * the highest list item blocks that cover the range.
+ * Return the array of items at the given range.
  *
  * Returns an empty array if no list of items can cover the range
  */
@@ -1730,44 +1847,18 @@ var getItemsAtRange = exports.getItemsAtRange = function getItemsAtRange(options
             return [];
         }
 
-        var _Editor$parent = _slate.Editor.parent(editor, _slate.Range.start(range)),
-            _Editor$parent2 = _slicedToArray(_Editor$parent, 2),
-            startElement = _Editor$parent2[0],
-            startElementPath = _Editor$parent2[1];
+        var allItems = _slate.Editor.nodes(editor, {
+            at: range,
+            match: function match(node) {
+                return (0, _.isItem)(options)(node);
+            }
+        });
 
-        var _Editor$parent3 = _slate.Editor.parent(editor, _slate.Range.end(range)),
-            _Editor$parent4 = _slicedToArray(_Editor$parent3, 2),
-            endElement = _Editor$parent4[0],
-            endElementPath = _Editor$parent4[1];
-
-        if (startElement === endElement) {
-            var item = (0, _.getCurrentItem)(options)(editor, startElementPath);
-            return item ? [item] : [];
-        }
-
-        var ancestorPath = _slate.Path.common(startElementPath, endElementPath);
-        var ancestor = _slate.Node.get(editor, ancestorPath);
-
-        if ((0, _.isList)(options)(ancestor)) {
-            return [].concat(_toConsumableArray(_slate.Editor.nodes(editor, {
-                at: range,
-                match: (0, _.isItem)(options)
-            }))).filter(function (_ref) {
-                var _ref2 = _slicedToArray(_ref, 2),
-                    listItemPath = _ref2[1];
-
-                return listItemPath.length === ancestorPath.length + 1;
-            });
-        } else if ((0, _.isItem)(options)(ancestor)) {
-            // The ancestor is the highest list item that covers the range
-            return [[ancestor, ancestorPath]];
-        }
-        // No list of items can cover the range
-        return [];
+        return [].concat(_toConsumableArray(allItems));
     };
 };
 
-},{".":27,"..":14,"slate":58}],25:[function(require,module,exports){
+},{".":29,"..":14,"slate":61}],26:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -1795,7 +1886,7 @@ var getListForItem = exports.getListForItem = function getListForItem(options) {
     };
 };
 
-},{".":27,"..":14,"slate":58}],26:[function(require,module,exports){
+},{".":29,"..":14,"slate":61}],27:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -1847,7 +1938,76 @@ var getPreviousItem = exports.getPreviousItem = function getPreviousItem(options
     };
 };
 
-},{".":27,"..":14,"slate":58}],27:[function(require,module,exports){
+},{".":29,"..":14,"slate":61}],28:[function(require,module,exports){
+'use strict';
+
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+exports.getTopmostItemsAtRange = undefined;
+
+var _slicedToArray = function () { function sliceIterator(arr, i) { var _arr = []; var _n = true; var _d = false; var _e = undefined; try { for (var _i = arr[Symbol.iterator](), _s; !(_n = (_s = _i.next()).done); _n = true) { _arr.push(_s.value); if (i && _arr.length === i) break; } } catch (err) { _d = true; _e = err; } finally { try { if (!_n && _i["return"]) _i["return"](); } finally { if (_d) throw _e; } } return _arr; } return function (arr, i) { if (Array.isArray(arr)) { return arr; } else if (Symbol.iterator in Object(arr)) { return sliceIterator(arr, i); } else { throw new TypeError("Invalid attempt to destructure non-iterable instance"); } }; }();
+
+var _slate = require('slate');
+
+require('..');
+
+var _ = require('.');
+
+function _toConsumableArray(arr) { if (Array.isArray(arr)) { for (var i = 0, arr2 = Array(arr.length); i < arr.length; i++) { arr2[i] = arr[i]; } return arr2; } else { return Array.from(arr); } }
+
+/**
+ * Return the array of items at the given range. The returned items are
+ * the highest list item blocks that cover the range.
+ *
+ * Returns an empty array if no list of items can cover the range
+ */
+var getTopmostItemsAtRange = exports.getTopmostItemsAtRange = function getTopmostItemsAtRange(options) {
+    return function (editor, range) {
+        range = range || editor.selection;
+
+        if (!range) {
+            return [];
+        }
+
+        var _Editor$parent = _slate.Editor.parent(editor, _slate.Range.start(range)),
+            _Editor$parent2 = _slicedToArray(_Editor$parent, 2),
+            startElement = _Editor$parent2[0],
+            startElementPath = _Editor$parent2[1];
+
+        var _Editor$parent3 = _slate.Editor.parent(editor, _slate.Range.end(range)),
+            _Editor$parent4 = _slicedToArray(_Editor$parent3, 2),
+            endElement = _Editor$parent4[0],
+            endElementPath = _Editor$parent4[1];
+
+        if (startElement === endElement) {
+            var item = (0, _.getCurrentItem)(options)(editor, startElementPath);
+            return item ? [item] : [];
+        }
+
+        var ancestorPath = _slate.Path.common(startElementPath, endElementPath);
+        var ancestor = _slate.Node.get(editor, ancestorPath);
+
+        if ((0, _.isList)(options)(ancestor)) {
+            return [].concat(_toConsumableArray(_slate.Editor.nodes(editor, {
+                at: range,
+                match: (0, _.isItem)(options)
+            }))).filter(function (_ref) {
+                var _ref2 = _slicedToArray(_ref, 2),
+                    listItemPath = _ref2[1];
+
+                return listItemPath.length === ancestorPath.length + 1;
+            });
+        } else if ((0, _.isItem)(options)(ancestor)) {
+            // The ancestor is the highest list item that covers the range
+            return [[ancestor, ancestorPath]];
+        }
+        // No list of items can cover the range
+        return [];
+    };
+};
+
+},{".":29,"..":14,"slate":61}],29:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -1914,6 +2074,18 @@ Object.keys(_getItemsAtRange).forEach(function (key) {
   });
 });
 
+var _getTopmostItemsAtRange = require('./getTopmostItemsAtRange');
+
+Object.keys(_getTopmostItemsAtRange).forEach(function (key) {
+  if (key === "default" || key === "__esModule") return;
+  Object.defineProperty(exports, key, {
+    enumerable: true,
+    get: function get() {
+      return _getTopmostItemsAtRange[key];
+    }
+  });
+});
+
 var _getListForItem = require('./getListForItem');
 
 Object.keys(_getListForItem).forEach(function (key) {
@@ -1974,7 +2146,19 @@ Object.keys(_isSelectionInList).forEach(function (key) {
   });
 });
 
-},{"./getCurrentItem":20,"./getCurrentList":21,"./getDeepestItemDepth":22,"./getItemDepth":23,"./getItemsAtRange":24,"./getListForItem":25,"./getPreviousItem":26,"./isItem":28,"./isList":29,"./isSelectionInList":30}],28:[function(require,module,exports){
+var _isListOrItem = require('./isListOrItem');
+
+Object.keys(_isListOrItem).forEach(function (key) {
+  if (key === "default" || key === "__esModule") return;
+  Object.defineProperty(exports, key, {
+    enumerable: true,
+    get: function get() {
+      return _isListOrItem[key];
+    }
+  });
+});
+
+},{"./getCurrentItem":21,"./getCurrentList":22,"./getDeepestItemDepth":23,"./getItemDepth":24,"./getItemsAtRange":25,"./getListForItem":26,"./getPreviousItem":27,"./getTopmostItemsAtRange":28,"./isItem":30,"./isList":31,"./isListOrItem":32,"./isSelectionInList":33}],30:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -1996,7 +2180,7 @@ var isItem = exports.isItem = function isItem(_ref) {
   };
 };
 
-},{"..":14,"slate":58}],29:[function(require,module,exports){
+},{"..":14,"slate":61}],31:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -2018,7 +2202,29 @@ var isList = exports.isList = function isList(_ref) {
   };
 };
 
-},{"..":14,"slate":58}],30:[function(require,module,exports){
+},{"..":14,"slate":61}],32:[function(require,module,exports){
+'use strict';
+
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+exports.isListOrItem = undefined;
+
+require('slate');
+
+require('..');
+
+var _isList = require('./isList');
+
+var _isItem = require('./isItem');
+
+var isListOrItem = exports.isListOrItem = function isListOrItem(options) {
+    return function (node) {
+        return (0, _isList.isList)(options)(node) || (0, _isItem.isItem)(options)(node);
+    };
+};
+
+},{"..":14,"./isItem":30,"./isList":31,"slate":61}],33:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -2037,11 +2243,11 @@ var _ = require('.');
  */
 var isSelectionInList = exports.isSelectionInList = function isSelectionInList(options) {
   return function (editor) {
-    return (0, _.getItemsAtRange)(options)(editor).length !== 0;
+    return (0, _.getTopmostItemsAtRange)(options)(editor).length !== 0;
   };
 };
 
-},{".":27,"..":14,"slate":58}],31:[function(require,module,exports){
+},{".":29,"..":14,"slate":61}],34:[function(require,module,exports){
 "use strict";
 
 exports.__esModule = true;
@@ -2243,7 +2449,7 @@ var _default = function _default(target, options) {
 
 exports["default"] = _default;
 module.exports = exports.default;
-},{}],32:[function(require,module,exports){
+},{}],35:[function(require,module,exports){
 /**
  * Returns a function, that, as long as it continues to be invoked, will not
  * be triggered. The function will be called after it stops being called for
@@ -2315,7 +2521,7 @@ debounce.debounce = debounce;
 
 module.exports = debounce;
 
-},{}],33:[function(require,module,exports){
+},{}],36:[function(require,module,exports){
 'use strict'
 
 module.exports = direction
@@ -2343,7 +2549,7 @@ function direction(value) {
   return 'neutral'
 }
 
-},{}],34:[function(require,module,exports){
+},{}],37:[function(require,module,exports){
 (function (global){
 /*! https://mths.be/esrever v0.2.0 by @mathias */
 ;(function(root) {
@@ -2419,7 +2625,7 @@ function direction(value) {
 }(this));
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],35:[function(require,module,exports){
+},{}],38:[function(require,module,exports){
 (function (process){
 'use strict';
 
@@ -4301,7 +4507,7 @@ exports.setUseProxies = setUseProxies;
 
 
 }).call(this,require('_process'))
-},{"_process":39}],36:[function(require,module,exports){
+},{"_process":42}],39:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -4547,7 +4753,7 @@ exports.parseHotkey = parseHotkey;
 exports.compareHotkey = compareHotkey;
 exports.toKeyCode = toKeyCode;
 exports.toKeyName = toKeyName;
-},{}],37:[function(require,module,exports){
+},{}],40:[function(require,module,exports){
 'use strict';
 
 /*!
@@ -4597,7 +4803,7 @@ function isPlainObject(o) {
 
 module.exports = isPlainObject;
 
-},{}],38:[function(require,module,exports){
+},{}],41:[function(require,module,exports){
 /*
 object-assign
 (c) Sindre Sorhus
@@ -4689,7 +4895,7 @@ module.exports = shouldUseNative() ? Object.assign : function (target, source) {
 	return to;
 };
 
-},{}],39:[function(require,module,exports){
+},{}],42:[function(require,module,exports){
 // shim for using process in browser
 var process = module.exports = {};
 
@@ -4875,7 +5081,7 @@ process.chdir = function (dir) {
 };
 process.umask = function() { return 0; };
 
-},{}],40:[function(require,module,exports){
+},{}],43:[function(require,module,exports){
 (function (process){
 /**
  * Copyright (c) 2013-present, Facebook, Inc.
@@ -4981,7 +5187,7 @@ checkPropTypes.resetWarningCache = function() {
 module.exports = checkPropTypes;
 
 }).call(this,require('_process'))
-},{"./lib/ReactPropTypesSecret":41,"_process":39}],41:[function(require,module,exports){
+},{"./lib/ReactPropTypesSecret":44,"_process":42}],44:[function(require,module,exports){
 /**
  * Copyright (c) 2013-present, Facebook, Inc.
  *
@@ -4995,7 +5201,7 @@ var ReactPropTypesSecret = 'SECRET_DO_NOT_PASS_THIS_OR_YOU_WILL_BE_FIRED';
 
 module.exports = ReactPropTypesSecret;
 
-},{}],42:[function(require,module,exports){
+},{}],45:[function(require,module,exports){
 (function (process){
 /** @license React v16.12.0
  * react-dom.development.js
@@ -32794,7 +33000,7 @@ module.exports = reactDom;
 }
 
 }).call(this,require('_process'))
-},{"_process":39,"object-assign":38,"prop-types/checkPropTypes":40,"react":47,"scheduler":52,"scheduler/tracing":53}],43:[function(require,module,exports){
+},{"_process":42,"object-assign":41,"prop-types/checkPropTypes":43,"react":50,"scheduler":55,"scheduler/tracing":56}],46:[function(require,module,exports){
 /** @license React v16.12.0
  * react-dom.production.min.js
  *
@@ -33086,7 +33292,7 @@ xe,ye,Ca.injectEventPluginsByName,fa,Sc,function(a){ya(a,Rc)},cb,db,Pd,Ba,Sj,{cu
 (function(a){var b=a.findFiberByHostInstance;return ok(n({},a,{overrideHookState:null,overrideProps:null,setSuspenseHandler:null,scheduleUpdate:null,currentDispatcherRef:Ea.ReactCurrentDispatcher,findHostInstanceByFiber:function(a){a=ic(a);return null===a?null:a.stateNode},findFiberByHostInstance:function(a){return b?b(a):null},findHostInstancesForRefresh:null,scheduleRefresh:null,scheduleRoot:null,setRefreshHandler:null,getCurrentFiber:null}))})({findFiberByHostInstance:Fc,bundleType:0,version:"16.12.0",
 rendererPackageName:"react-dom"});var Dk={default:Ck},Ek=Dk&&Ck||Dk;module.exports=Ek.default||Ek;
 
-},{"object-assign":38,"react":47,"scheduler":52}],44:[function(require,module,exports){
+},{"object-assign":41,"react":50,"scheduler":55}],47:[function(require,module,exports){
 (function (process){
 'use strict';
 
@@ -33128,7 +33334,7 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 }).call(this,require('_process'))
-},{"./cjs/react-dom.development.js":42,"./cjs/react-dom.production.min.js":43,"_process":39}],45:[function(require,module,exports){
+},{"./cjs/react-dom.development.js":45,"./cjs/react-dom.production.min.js":46,"_process":42}],48:[function(require,module,exports){
 (function (process){
 /** @license React v16.12.0
  * react.development.js
@@ -35452,7 +35658,7 @@ module.exports = react;
 }
 
 }).call(this,require('_process'))
-},{"_process":39,"object-assign":38,"prop-types/checkPropTypes":40}],46:[function(require,module,exports){
+},{"_process":42,"object-assign":41,"prop-types/checkPropTypes":43}],49:[function(require,module,exports){
 /** @license React v16.12.0
  * react.production.min.js
  *
@@ -35479,7 +35685,7 @@ b,c){return W().useImperativeHandle(a,b,c)},useDebugValue:function(){},useLayout
 if(null!=b){void 0!==b.ref&&(g=b.ref,l=J.current);void 0!==b.key&&(d=""+b.key);if(a.type&&a.type.defaultProps)var f=a.type.defaultProps;for(k in b)K.call(b,k)&&!L.hasOwnProperty(k)&&(e[k]=void 0===b[k]&&void 0!==f?f[k]:b[k])}var k=arguments.length-2;if(1===k)e.children=c;else if(1<k){f=Array(k);for(var m=0;m<k;m++)f[m]=arguments[m+2];e.children=f}return{$$typeof:p,type:a.type,key:d,ref:g,props:e,_owner:l}},createFactory:function(a){var b=M.bind(null,a);b.type=a;return b},isValidElement:N,version:"16.12.0",
 __SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED:{ReactCurrentDispatcher:I,ReactCurrentBatchConfig:{suspense:null},ReactCurrentOwner:J,IsSomeRendererActing:{current:!1},assign:h}},Y={default:X},Z=Y&&X||Y;module.exports=Z.default||Z;
 
-},{"object-assign":38}],47:[function(require,module,exports){
+},{"object-assign":41}],50:[function(require,module,exports){
 (function (process){
 'use strict';
 
@@ -35490,7 +35696,7 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 }).call(this,require('_process'))
-},{"./cjs/react.development.js":45,"./cjs/react.production.min.js":46,"_process":39}],48:[function(require,module,exports){
+},{"./cjs/react.development.js":48,"./cjs/react.production.min.js":49,"_process":42}],51:[function(require,module,exports){
 (function (process){
 /** @license React v0.18.0
  * scheduler-tracing.development.js
@@ -35917,7 +36123,7 @@ exports.unstable_unsubscribe = unstable_unsubscribe;
 }
 
 }).call(this,require('_process'))
-},{"_process":39}],49:[function(require,module,exports){
+},{"_process":42}],52:[function(require,module,exports){
 /** @license React v0.18.0
  * scheduler-tracing.production.min.js
  *
@@ -35929,7 +36135,7 @@ exports.unstable_unsubscribe = unstable_unsubscribe;
 
 'use strict';Object.defineProperty(exports,"__esModule",{value:!0});var b=0;exports.__interactionsRef=null;exports.__subscriberRef=null;exports.unstable_clear=function(a){return a()};exports.unstable_getCurrent=function(){return null};exports.unstable_getThreadID=function(){return++b};exports.unstable_trace=function(a,d,c){return c()};exports.unstable_wrap=function(a){return a};exports.unstable_subscribe=function(){};exports.unstable_unsubscribe=function(){};
 
-},{}],50:[function(require,module,exports){
+},{}],53:[function(require,module,exports){
 (function (process){
 /** @license React v0.18.0
  * scheduler.development.js
@@ -36837,7 +37043,7 @@ exports.unstable_Profiling = unstable_Profiling;
 }
 
 }).call(this,require('_process'))
-},{"_process":39}],51:[function(require,module,exports){
+},{"_process":42}],54:[function(require,module,exports){
 /** @license React v0.18.0
  * scheduler.production.min.js
  *
@@ -36861,7 +37067,7 @@ exports.unstable_scheduleCallback=function(a,b,c){var d=exports.unstable_now();i
 exports.unstable_wrapCallback=function(a){var b=R;return function(){var c=R;R=b;try{return a.apply(this,arguments)}finally{R=c}}};exports.unstable_getCurrentPriorityLevel=function(){return R};exports.unstable_shouldYield=function(){var a=exports.unstable_now();V(a);var b=L(N);return b!==Q&&null!==Q&&null!==b&&null!==b.callback&&b.startTime<=a&&b.expirationTime<Q.expirationTime||k()};exports.unstable_requestPaint=Z;exports.unstable_continueExecution=function(){T||S||(T=!0,f(X))};
 exports.unstable_pauseExecution=function(){};exports.unstable_getFirstCallbackNode=function(){return L(N)};exports.unstable_Profiling=null;
 
-},{}],52:[function(require,module,exports){
+},{}],55:[function(require,module,exports){
 (function (process){
 'use strict';
 
@@ -36872,7 +37078,7 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 }).call(this,require('_process'))
-},{"./cjs/scheduler.development.js":50,"./cjs/scheduler.production.min.js":51,"_process":39}],53:[function(require,module,exports){
+},{"./cjs/scheduler.development.js":53,"./cjs/scheduler.production.min.js":54,"_process":42}],56:[function(require,module,exports){
 (function (process){
 'use strict';
 
@@ -36883,7 +37089,7 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 }).call(this,require('_process'))
-},{"./cjs/scheduler-tracing.development.js":48,"./cjs/scheduler-tracing.production.min.js":49,"_process":39}],54:[function(require,module,exports){
+},{"./cjs/scheduler-tracing.development.js":51,"./cjs/scheduler-tracing.production.min.js":52,"_process":42}],57:[function(require,module,exports){
 "use strict";
 
 exports.__esModule = true;
@@ -36957,7 +37163,7 @@ function scrollIntoView(target, options) {
 var _default = scrollIntoView;
 exports["default"] = _default;
 module.exports = exports.default;
-},{"compute-scroll-into-view":31}],55:[function(require,module,exports){
+},{"compute-scroll-into-view":34}],58:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, '__esModule', { value: true });
@@ -37228,7 +37434,7 @@ exports.SAVING = SAVING;
 exports.withHistory = withHistory;
 
 
-},{"is-plain-object":37,"slate":58}],56:[function(require,module,exports){
+},{"is-plain-object":40,"slate":61}],59:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, '__esModule', { value: true });
@@ -37654,7 +37860,7 @@ exports.createHyperscript = createHyperscript;
 exports.jsx = jsx;
 
 
-},{"is-plain-object":37,"slate":58}],57:[function(require,module,exports){
+},{"is-plain-object":40,"slate":61}],60:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, '__esModule', { value: true });
@@ -39548,7 +39754,7 @@ exports.useSlate = useSlate;
 exports.withReact = withReact;
 
 
-},{"debounce":32,"direction":33,"is-hotkey":36,"react":47,"react-dom":44,"scroll-into-view-if-needed":54,"slate":58}],58:[function(require,module,exports){
+},{"debounce":35,"direction":36,"is-hotkey":39,"react":50,"react-dom":47,"scroll-into-view-if-needed":57,"slate":61}],61:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, '__esModule', { value: true });
@@ -45206,4 +45412,4 @@ exports.Transforms = Transforms;
 exports.createEditor = createEditor;
 
 
-},{"esrever":34,"immer":35,"is-plain-object":37}]},{},[1]);
+},{"esrever":37,"immer":38,"is-plain-object":40}]},{},[1]);
