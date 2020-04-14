@@ -1416,6 +1416,8 @@ Object.defineProperty(exports, "__esModule", {
     value: true
 });
 
+var _extends = Object.assign || function (target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i]; for (var key in source) { if (Object.prototype.hasOwnProperty.call(source, key)) { target[key] = source[key]; } } } return target; };
+
 var _slicedToArray = function () { function sliceIterator(arr, i) { var _arr = []; var _n = true; var _d = false; var _e = undefined; try { for (var _i = arr[Symbol.iterator](), _s; !(_n = (_s = _i.next()).done); _n = true) { _arr.push(_s.value); if (i && _arr.length === i) break; } } catch (err) { _d = true; _e = err; } finally { try { if (!_n && _i["return"]) _i["return"](); } finally { if (_d) throw _e; } } return _arr; } return function (arr, i) { if (Array.isArray(arr)) { return arr; } else if (Symbol.iterator in Object(arr)) { return sliceIterator(arr, i); } else { throw new TypeError("Invalid attempt to destructure non-iterable instance"); } }; }();
 
 exports.itemChildrenAreAlwaysElements = itemChildrenAreAlwaysElements;
@@ -1423,6 +1425,44 @@ exports.itemChildrenAreAlwaysElements = itemChildrenAreAlwaysElements;
 var _slate = require('slate');
 
 var _utils = require('../utils');
+
+var createWrapperNode = function createWrapperNode(wrapperType) {
+    return {
+        type: wrapperType,
+        children: []
+    };
+};
+
+/**
+ * Generates new children by carrying over elements and grouping all
+ * non element nodes under a new wrapper node
+ */
+var getNewChildren = function getNewChildren(children, wrapperType) {
+    var newChildren = [];
+    var needsNewWrapper = true;
+
+    children.forEach(function (child) {
+        if (_slate.Element.isElement(child)) {
+            newChildren.push(child);
+            needsNewWrapper = true;
+
+            return;
+        }
+
+        var currentGroup = newChildren[newChildren.length - 1];
+        var shouldCreateNewGroup = !currentGroup || needsNewWrapper;
+
+        if (shouldCreateNewGroup) {
+            currentGroup = createWrapperNode(wrapperType);
+            newChildren.push(currentGroup);
+            needsNewWrapper = false;
+        }
+
+        currentGroup.children.push(child);
+    });
+
+    return newChildren;
+};
 
 /**
  * A rule that wraps children of lists with list item
@@ -1436,27 +1476,24 @@ function itemChildrenAreAlwaysElements(options, editor) {
             node = _entry[0],
             nodePath = _entry[1];
 
-        var parentNodePath = void 0;
-
-        try {
-            parentNodePath = _slate.Path.parent(nodePath);
-        } catch (e) {
-            // has no parent (ie. editor)
+        if (!(0, _utils.isItem)(options)(node) || node.children.length === 0) {
             normalizeNode(entry);
 
             return;
         }
 
-        var parentNode = _slate.Node.get(editor, parentNodePath);
+        var hasTexts = node.children.some(function (child) {
+            return !_slate.Element.isElement(child);
+        });
+        if (hasTexts) {
+            var newChildren = getNewChildren(node.children, options.typeDefault);
 
-        if (!_slate.Element.isElement(node) && (0, _utils.isItem)(options)(parentNode)) {
-            var wrapperItem = {
-                type: options.typeDefault,
-                children: []
-            };
-
-            _slate.Transforms.wrapNodes(editor, wrapperItem, {
-                at: nodePath
+            _slate.Editor.withoutNormalizing(editor, function () {
+                _slate.Transforms.removeNodes(editor, { at: nodePath });
+                var newNode = _extends({}, node, {
+                    children: newChildren
+                });
+                _slate.Transforms.insertNodes(editor, newNode, { at: nodePath });
             });
 
             return;
