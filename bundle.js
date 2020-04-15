@@ -891,9 +891,16 @@ function _toConsumableArray(arr) { if (Array.isArray(arr)) { for (var i = 0, arr
 
 /**
  * Returns the highest list of elements that cover the current selection
+ * TODO: might be redundant with getTopmostItemsAtRange.js
  */
 var getHighestSelectedElements = function getHighestSelectedElements(editor) {
-    if (_slate.Path.equals(editor.selection.anchor.path, editor.selection.focus.path)) {
+    var selection = editor.selection;
+
+    if (!selection) {
+        return [];
+    }
+
+    if (_slate.Path.equals(selection.anchor.path, selection.focus.path)) {
         var ancestor = _slate.Editor.above(editor, {
             match: function match(n) {
                 return _slate.Editor.isBlock(editor, n);
@@ -903,10 +910,10 @@ var getHighestSelectedElements = function getHighestSelectedElements(editor) {
         return [ancestor];
     }
 
-    var ancestorPath = _slate.Path.common(editor.selection.anchor.path, editor.selection.focus.path);
+    var ancestorPath = _slate.Path.common(selection.anchor.path, selection.focus.path);
 
-    var startIndex = _slate.Path.relative(editor.selection.anchor.path, ancestorPath)[0];
-    var endIndex = _slate.Path.relative(editor.selection.focus.path, ancestorPath)[0];
+    var startIndex = _slate.Path.relative(selection.anchor.path, ancestorPath)[0];
+    var endIndex = _slate.Path.relative(selection.focus.path, ancestorPath)[0];
 
     return [].concat(_toConsumableArray(_slate.Node.children(editor, ancestorPath))).slice(startIndex, endIndex + 1);
 };
