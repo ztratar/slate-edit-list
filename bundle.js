@@ -1444,12 +1444,12 @@ var createWrapperNode = function createWrapperNode(wrapperType) {
  * Generates new children by carrying over elements and grouping all
  * non element nodes under a new wrapper node
  */
-var getNewChildren = function getNewChildren(children, wrapperType) {
+var getNewChildren = function getNewChildren(editor, children, wrapperType) {
     var newChildren = [];
     var needsNewWrapper = true;
 
     children.forEach(function (child) {
-        if (_slate.Element.isElement(child)) {
+        if (_slate.Element.isElement(child) && !editor.isInline(child)) {
             newChildren.push(child);
             needsNewWrapper = true;
 
@@ -1493,7 +1493,7 @@ function itemChildrenAreAlwaysElements(options, editor) {
             return !_slate.Element.isElement(child);
         });
         if (hasTexts) {
-            var newChildren = getNewChildren(node.children, options.typeDefault);
+            var newChildren = getNewChildren(editor, node.children, options.typeDefault);
 
             _slate.Editor.withoutNormalizing(editor, function () {
                 _slate.Transforms.removeNodes(editor, { at: nodePath });
