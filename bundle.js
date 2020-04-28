@@ -2000,6 +2000,15 @@ var _ = require('.');
 
 function _toConsumableArray(arr) { if (Array.isArray(arr)) { for (var i = 0, arr2 = Array(arr.length); i < arr.length; i++) { arr2[i] = arr[i]; } return arr2; } else { return Array.from(arr); } }
 
+var takeOnlyDirectChildren = function takeOnlyDirectChildren(ancestorPath) {
+    return function (_ref) {
+        var _ref2 = _slicedToArray(_ref, 2),
+            listItemPath = _ref2[1];
+
+        return listItemPath.length === ancestorPath.length + 1;
+    };
+};
+
 /**
  * Return the array of items at the given range. The returned items are
  * the highest list item blocks that cover the range.
@@ -2032,20 +2041,21 @@ var getTopmostItemsAtRange = exports.getTopmostItemsAtRange = function getTopmos
         var ancestorPath = _slate.Path.common(startElementPath, endElementPath);
         var ancestor = _slate.Node.get(editor, ancestorPath);
 
-        if ((0, _.isList)(options)(ancestor)) {
-            return [].concat(_toConsumableArray(_slate.Editor.nodes(editor, {
-                at: range,
-                match: (0, _.isItem)(options)
-            }))).filter(function (_ref) {
-                var _ref2 = _slicedToArray(_ref, 2),
-                    listItemPath = _ref2[1];
+        while (ancestorPath.length !== 0) {
+            if ((0, _.isList)(options)(ancestor)) {
+                return [].concat(_toConsumableArray(_slate.Editor.nodes(editor, {
+                    at: range,
+                    match: (0, _.isItem)(options)
+                }))).filter(takeOnlyDirectChildren(ancestorPath));
+            } else if ((0, _.isItem)(options)(ancestor)) {
+                // The ancestor is the highest list item that covers the range
+                return [[ancestor, ancestorPath]];
+            }
 
-                return listItemPath.length === ancestorPath.length + 1;
-            });
-        } else if ((0, _.isItem)(options)(ancestor)) {
-            // The ancestor is the highest list item that covers the range
-            return [[ancestor, ancestorPath]];
+            ancestorPath = ancestorPath.slice(0, -1);
+            ancestor = _slate.Node.get(editor, ancestorPath);
         }
+
         // No list of items can cover the range
         return [];
     };
