@@ -1181,11 +1181,11 @@ var KEY_TAB = 'Tab';
 var KEY_BACKSPACE = 'Backspace';
 
 var applyNormalization = function applyNormalization(options, editor) {
-    (0, _normalizers.childOfListIsAlwaysItem)(options, editor);
-    (0, _normalizers.itemChildrenAreAlwaysElements)(options, editor);
-    (0, _normalizers.itemsWithoutParentListAreUnwrapped)(options, editor);
-    (0, _normalizers.joinAdjacentLists)(options, editor);
-    (0, _normalizers.unwrapListsOverDepthLimit)(options, editor);
+    var normalizers = [_normalizers.childOfListIsAlwaysItem, _normalizers.itemChildrenAreAlwaysElements, _normalizers.itemsWithoutParentListAreUnwrapped, _normalizers.joinAdjacentLists, _normalizers.unwrapListsOverDepthLimit];
+
+    normalizers.forEach(function (addNormalizer) {
+        addNormalizer(options, editor);
+    });
 };
 
 /**
@@ -2040,6 +2040,27 @@ var getTopmostItemsAtRange = exports.getTopmostItemsAtRange = function getTopmos
 
         var ancestorPath = _slate.Path.common(startElementPath, endElementPath);
         var ancestor = _slate.Node.get(editor, ancestorPath);
+
+        if (_slate.Editor.isEditor(ancestor)) {
+            var topMostLists = [].concat(_toConsumableArray(_slate.Editor.nodes(editor, {
+                at: range,
+                match: (0, _.isList)(options),
+                mode: 'highest'
+            })));
+
+            return topMostLists.reduce(function (items, _ref3) {
+                var _ref4 = _slicedToArray(_ref3, 2),
+                    listPath = _ref4[1];
+
+                var topMostListItems = [].concat(_toConsumableArray(_slate.Editor.nodes(editor, {
+                    at: listPath,
+                    match: (0, _.isItem)(options),
+                    mode: 'highest'
+                })));
+
+                return items.concat(topMostListItems);
+            }, []);
+        }
 
         while (ancestorPath.length !== 0) {
             if ((0, _.isList)(options)(ancestor)) {
