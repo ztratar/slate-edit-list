@@ -698,7 +698,12 @@ var splitListItem = exports.splitListItem = function splitListItem(options) {
             return v;
         });
 
-        _slate.Transforms.delete(editor, { distance: textForNewItem.length });
+        if (textForNewItem.length) {
+            // Only delete the last part of the current selected node
+            // if there is content to delete, else this will remove
+            // many nodes for some reason.
+            _slate.Transforms.delete(editor, { distance: textForNewItem.length });
+        }
 
         _slate.Transforms.insertNodes(editor, {
             type: 'list_item',
